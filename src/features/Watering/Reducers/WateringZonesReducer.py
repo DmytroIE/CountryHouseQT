@@ -1,8 +1,5 @@
-statuses = {0: "Выключен", 1: "В ожидании", 2: "В работе", 3: "Неисправность"}
-OFF = 0
-PENDING = 1
-IN_WORK = 2
-FAULTY = 3
+from src.utils.WateringStatuses import *
+
 
 watering_zones_initial = [
     {'ID': 'LZliGv4F', 'typ_flow': 1.2, 'gpio_num': 13, 'enabled': False, 'status': PENDING, 'progress': 0.0,

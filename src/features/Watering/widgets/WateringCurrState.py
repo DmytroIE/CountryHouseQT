@@ -1,9 +1,12 @@
 from PyQt5.QtWidgets import QFrame, QLabel, QVBoxLayout, QHBoxLayout
 
+from src.store.store import ConnectedWithStoreComponent
 
-class WateringCurrState(QFrame):
+
+class WateringCurrState(ConnectedWithStoreComponent, QFrame):
     def __init__(self, parent=None):
-        super().__init__(parent)
+        QFrame.__init__(self, parent)
+        ConnectedWithStoreComponent.__init__(self)
 
         self.setFrameStyle(QFrame.Panel | QFrame.Raised)
         self.setStyleSheet("background-color: beige")
@@ -27,3 +30,11 @@ class WateringCurrState(QFrame):
         self._lyt_main = QVBoxLayout(self)
         self._lyt_main.addWidget(self._frm_curr_flow)
         self._lyt_main.addWidget(self._frm_curr_state)
+
+        self._lyt_main.setContentsMargins(2, 2, 2, 2)
+
+    def _get_own_state(self):  # selector
+        pass
+
+    def _on_state_update(self, new_state, list_, action):
+        pass

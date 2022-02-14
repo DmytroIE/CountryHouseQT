@@ -9,6 +9,7 @@ class WateringDuration(QFrame):
 
         self.setFrameStyle(QFrame.Panel | QFrame.Raised)
         self._lyt_main = QVBoxLayout(self)
+        self._lyt_main.setContentsMargins(2, 2, 2, 2)
 
         self._spb_duration = QSpinBox(self)
 

@@ -4,7 +4,6 @@ from PyQt5.QtWidgets import QTabWidget
 
 from src.features.Watering.widgets.Watering import Watering
 from src.features.AlarmLog.widgets.AlarmLog import AlarmLog
-from src.store.store import store
 
 
 class MainWidget(QtWidgets.QWidget):
@@ -16,7 +15,7 @@ class MainWidget(QtWidgets.QWidget):
         self._tab_main = QTabWidget(self)
 
         self._scr_watering = QtWidgets.QScrollArea()
-        self._wdg_watering = Watering(store)
+        self._wdg_watering = Watering()
         self._scr_watering.setWidget(self._wdg_watering)
 
         self._tab_main.addTab(self._scr_watering, 'Watering')
