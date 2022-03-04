@@ -1,15 +1,15 @@
 from PyQt5.QtWidgets import QFrame, QVBoxLayout
 
 from src.features.Watering.widgets.WateringZone import WateringZone
-from src.store.store import ConnectedWithStoreComponent
+from src.store.store import ConnectedToStoreComponent
 
 
-class WateringZoneList(ConnectedWithStoreComponent, QFrame):
+class WateringZoneList(ConnectedToStoreComponent, QFrame):
 
     def __init__(self, parent=None):
 
         QFrame.__init__(self, parent)
-        ConnectedWithStoreComponent.__init__(self)
+        ConnectedToStoreComponent.__init__(self)
 
         self.setFrameStyle(QFrame.Panel | QFrame.Raised)
 
@@ -24,10 +24,9 @@ class WateringZoneList(ConnectedWithStoreComponent, QFrame):
         # self._lyt_main.addWidget(self._wz2)
         # self._lyt_main.addWidget(self._wz3)
         self._updater()
-
         # Для проверки, как работает вставка виджета на основании экшна wateringzones/ADD_ITEM
         # self._dispatch({'type': 'wateringzones/ADD_ITEM', 'payload': {'index': 1,
-        #                                                               'new_item': {'ID': 'LZliGv4F', 'typ_flow': 1.2,
+        #                                                               'new_item': {'ID': 'LZliGv4F', 'typ_flow': 1.3,
         #                                                                            'gpio_num': 13, 'enabled': False,
         #                                                                            'status': 1, 'progress': 0.0,
         #                                                                            'manu_mode_on': True,
@@ -47,6 +46,8 @@ class WateringZoneList(ConnectedWithStoreComponent, QFrame):
                     self._children[ind].apply_updates({'number': ind+1})
             for ind2, item2 in enumerate(self._children):
                 self._lyt_main.addWidget(item2)
+
+            # self._dispatch()
 
         elif action == 'DELETE':
             pass

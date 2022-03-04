@@ -18,7 +18,7 @@ class MainWidget(QtWidgets.QWidget):
         self._wdg_watering = Watering()
         self._scr_watering.setWidget(self._wdg_watering)
 
-        self._tab_main.addTab(self._scr_watering, 'Watering')
+        self._tab_main.addTab(self._scr_watering, 'Полив')
 
         self._wdg_alarm_log = AlarmLog()
 

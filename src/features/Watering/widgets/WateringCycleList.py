@@ -1,15 +1,15 @@
 from PyQt5.QtWidgets import QFrame, QHBoxLayout
 
 from src.features.Watering.widgets.WateringCycle import WateringCycle
-from src.store.store import ConnectedWithStoreComponent
+from src.store.store import ConnectedToStoreComponent
 
 
-class WateringCycleList(ConnectedWithStoreComponent, QFrame):
+class WateringCycleList(ConnectedToStoreComponent, QFrame):
 
     def __init__(self, store, parent=None):
 
         QFrame.__init__(self, parent)
-        ConnectedWithStoreComponent.__init__(self)
+        ConnectedToStoreComponent.__init__(self)
 
         self.setFrameStyle(QFrame.Panel | QFrame.Raised)
 
