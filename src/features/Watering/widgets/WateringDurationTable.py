@@ -24,7 +24,7 @@ class WateringDurationTable(ConnectedToStoreComponent, QWidget):
                 item = self._cached[ind_c][ind_z]
                 self._children[ind_c][ind_z] = WateringDuration(item['duration'])
                 self._lyt_main.addWidget(self._children[ind_c][ind_z], ind_z, ind_c)
-
+        # print(self._children)
 
     def _updater(self):
         # print(f'old state = {self._cached}')
@@ -33,14 +33,16 @@ class WateringDurationTable(ConnectedToStoreComponent, QWidget):
             # ---------------------добавились строка или строки-----------------------
             if len(new_state[0]) > len(self._cached[0]):  # достаточно сравнить первый столбец,
                                                           # как минимум один столбец должен быть
-                #print('updater')
+                # print('updater')
                 # print(f'new_state = {new_state}')
                 for ind_c, item_c in enumerate(new_state):
                     for ind_z, item_z in enumerate(new_state[ind_c]):
-
-                         for ind, item in enumerate(self._cached[ind_c]):
-                             if item_z['ID'] != item['ID']:
-                                self._children[ind_c].insert(ind_z, WateringDuration(item_z['duration']))
+                        is_in_cach_state = False
+                        for ind, item in enumerate(self._cached[ind_c]):
+                            if item_z['ID'] == item['ID']:
+                                is_in_cach_state = True
+                        if not is_in_cach_state:
+                            self._children[ind_c].insert(ind_z, WateringDuration(item_z['duration']))
 
                 for ind_c, item_c in enumerate(new_state):
                     for ind_z, item_z in enumerate(new_state[ind_c]):
