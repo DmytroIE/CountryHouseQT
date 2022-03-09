@@ -1,6 +1,6 @@
 import pydux
-from shortid import ShortId
 
+from src.features.Watering.middleware.WateringMiddleware import watering_action_dialogs_mw, durations_table_mw
 from src.store.ConnectedComponent import ConnectedComponent
 
 from src.features.Watering.Reducers.WateringReducer import watering_reducer
@@ -21,27 +21,7 @@ root_reducer = pydux.combine_reducers({'watering': watering_reducer
 #     return wrapper
 
 
-def mw(store_):
-    dispatch, get_state = store_['dispatch'], store_['get_state']
-
-    def disp(next_):
-        def act(action):
-            next_(action)
-            if action['type'] == 'wateringzones/ADD_ITEM':
-                # print(get_state())
-                dispatch({'type': 'wateringdurations/ADD_ROW',
-                          'payload': {'index': action['payload']['index'],
-                                      'zone_ID': action['payload']['new_item']['ID']}})
-            elif action['type'] == 'wateringzones/DELETE_ITEM':
-                dispatch({'type': 'wateringdurations/DELETE_ROW',
-                          'payload': action['payload']})
-
-        return act
-
-    return disp
-
-
-mw_stack = pydux.apply_middleware(mw)  # , thunk_middleware)
+mw_stack = pydux.apply_middleware(watering_action_dialogs_mw, durations_table_mw)
 
 store = pydux.create_store(root_reducer, None, mw_stack)
 

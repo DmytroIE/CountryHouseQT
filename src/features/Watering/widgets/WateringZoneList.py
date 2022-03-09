@@ -60,6 +60,8 @@ class WateringZoneList(ConnectedToStoreComponent, QWidget):
                 self._lyt_main.removeWidget(self._children[index_of_deleted_item])
                 self._children[index_of_deleted_item].deleteLater()
                 self._children.pop(index_of_deleted_item)
+            for ind, item in enumerate(self._children):
+                item.apply_updates({'number': ind + 1})
 
         elif action == 'UPDATE':
             for ind, child in enumerate(self._children):

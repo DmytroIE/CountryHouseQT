@@ -40,7 +40,7 @@ class ConnectedComponent:
             # и тогда вся вот эта функция вообще не будет вызываться
 
             new_state = self._get_own_state()  # эта функция должна быть в классе-наследнике, типа селектора
-            if self._cached != new_state:
+            if self._cached is not new_state:
                 # --------------------------Primitive---------------
                 if isinstance(new_state, (int, float, str, bool)):
                     self._on_state_update(new_state)  # эта функция должна быть в классе-наследнике, который юзает

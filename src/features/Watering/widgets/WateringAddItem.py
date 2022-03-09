@@ -15,8 +15,8 @@ class WateringAddItem(ConnectedToStoreComponent, QWidget):
         self._lyt_main.setContentsMargins(0, 0, 0, 0)
 
         # ------------new zone row------------
-        self._lyt_row1 = QHBoxLayout(self)
-        self._lyt_main.setContentsMargins(2, 2, 2, 2)
+        self._lyt_row1 = QHBoxLayout()
+        self._lyt_row1.setContentsMargins(2, 2, 2, 2)
 
         self._btn_add_zone = QPushButton('Добавить зону')
         self._btn_add_zone.clicked.connect(self._add_new_zone)
@@ -32,8 +32,8 @@ class WateringAddItem(ConnectedToStoreComponent, QWidget):
         self._lyt_row1.addWidget(self._spb_new_zone_index)
 
         # ------------new cycle row------------
-        self._lyt_row2 = QHBoxLayout(self)
-        self._lyt_main.setContentsMargins(2, 2, 2, 2)
+        self._lyt_row2 = QHBoxLayout()
+        self._lyt_row2.setContentsMargins(2, 2, 2, 2)
 
         self._btn_add_cycle = QPushButton('Добавить цикл')
         # self._btn_add_zone.clicked.connect()
