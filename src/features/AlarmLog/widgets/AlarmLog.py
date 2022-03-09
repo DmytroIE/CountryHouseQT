@@ -1,18 +1,18 @@
 from shortid import ShortId
-from PyQt5.QtWidgets import QFrame, QVBoxLayout, QLabel, QListWidget, QHBoxLayout, QPushButton
+from PyQt5.QtWidgets import QFrame, QVBoxLayout, QLabel, QListWidget, QHBoxLayout, QPushButton, QWidget
 from PyQt5.QtCore import QSize
 
 from src.features.AlarmLog.widgets.AlarmList import AlarmList
 from src.store.store import ConnectedToStoreComponent
 
 
-class AlarmLog(ConnectedToStoreComponent, QFrame):
+class AlarmLog(ConnectedToStoreComponent, QWidget):
 
     def __init__(self, parent=None):
         QFrame.__init__(self, parent)
         ConnectedToStoreComponent.__init__(self)
 
-        self.setFrameStyle(QFrame.Panel | QFrame.Raised)
+        # self.setFrameStyle(QFrame.Panel | QFrame.Raised)
 
         self._lyt_main = QHBoxLayout(self)
 
@@ -42,29 +42,7 @@ class AlarmLog(ConnectedToStoreComponent, QFrame):
     # временная функция для проверки добавления или удаления виджета в wateringzonelist
     # функции обработки нажатия на кнопки содержат пока проверочный код
     def _on_ackn(self):
-        # Для проверки, как работает вставка виджета на основании экшна wateringzones/ADD_ITEM
-        self._dispatch({'type': 'wateringzones/ADD_ITEM', 'payload': {'index': 2,
-                                                                      'new_item': {'ID': self._sid.generate(), 'typ_flow': 6.5,
-                                                                                   'gpio_num': 13, 'enabled': False,
-                                                                                   'status': 1, 'progress': 0.0,
-                                                                                   'manu_mode_on': True,
-                                                                                   'manually_on': True}}})
-
-        # payload = {'index': 2,
-        #            'new_item': {'ID': self._sid.generate(),
-        #                         'typ_flow': 1.2,
-        #                         'gpio_num': 13,
-        #                         'enabled': False,
-        #                         'status': 1,
-        #                         'progress': 0.0,
-        #                         'manu_mode_on': True,
-        #                         'manually_on': True}}
-        #
-        # def addZone(dispatch):
-        #     dispatch({'type': 'wateringzones/ADD_ITEM', 'payload': payload})
-        #     # dispatch({'type': 'wateringdurations/ADD_ROW', 'payload': {'index':5}})
-        # self._dispatch(addZone)
-
+        pass
 
     def _on_clear(self):
         pass

@@ -12,23 +12,23 @@
 # }
 
 
-# watering_durations_initial = [
-#         [{'ID': ('CPyCGmQ0F', 'LZliGv4F'), 'duration': 15},
-#          {'ID': ('CPyCGmQ0F', 'FclCGDyZx'), 'duration': 15},
-#          {'ID': ('CPyCGmQ0F', 'iPyLGSJbx'), 'duration': 15},
-#          {'ID': ('CPyCGmQ0F', 'Fcyi4kPtV'), 'duration': 15},
-#          {'ID': ('CPyCGmQ0F', 'iBwi42jQ1'), 'duration': 15}],
-#         [{'ID': ('Lcli4yFwL', 'LZliGv4F'), 'duration': 15},
-#          {'ID': ('Lcli4yFwL', 'FclCGDyZx'), 'duration': 15},
-#          {'ID': ('Lcli4yFwL', 'iPyLGSJbx'), 'duration': 15},
-#          {'ID': ('Lcli4yFwL', 'Fcyi4kPtV'), 'duration': 15},
-#          {'ID': ('Lcli4yFwL', 'iBwi42jQ1'), 'duration': 15}]
-#     ]
-
 watering_durations_initial = [
-        [15, 15, 15, 15, 15],
-        [15, 15, 15, 15, 15]
+        [{'ID': ('CPyCGmQ0F', 'LZliGv4F'), 'duration': 15},
+         {'ID': ('CPyCGmQ0F', 'FclCGDyZx'), 'duration': 15},
+         {'ID': ('CPyCGmQ0F', 'iPyLGSJbx'), 'duration': 15},
+         {'ID': ('CPyCGmQ0F', 'Fcyi4kPtV'), 'duration': 15},
+         {'ID': ('CPyCGmQ0F', 'iBwi42jQ1'), 'duration': 15}],
+        [{'ID': ('Lcli4yFwL', 'LZliGv4F'), 'duration': 15},
+         {'ID': ('Lcli4yFwL', 'FclCGDyZx'), 'duration': 15},
+         {'ID': ('Lcli4yFwL', 'iPyLGSJbx'), 'duration': 15},
+         {'ID': ('Lcli4yFwL', 'Fcyi4kPtV'), 'duration': 15},
+         {'ID': ('Lcli4yFwL', 'iBwi42jQ1'), 'duration': 15}]
     ]
+
+# watering_durations_initial = [
+#         [15, 15, 15, 15, 15],
+#         [15, 15, 15, 15, 15]
+#     ]
 
 DEFAULT_DURATION = 10
 
@@ -40,11 +40,24 @@ def watering_durations_reducer(state=None, action=None):
         new_state = [item.copy() for item in state]
 
         for item in new_state:
-            item.insert(action['payload']['index'], DEFAULT_DURATION)
+            ID = (item[0]['ID'][0], action['payload']['zone_ID'])
+            # print(ID)
+            item.insert(action['payload']['index'],
+                        {
+                            'ID': ID,
+                            'duration': DEFAULT_DURATION
+                        })
         # print(f'new_state = {new_state}')
         return new_state
-    # elif action['type'] == 'wateringcycles/ADD_ITEM':
-    #     return state
+    elif action['type'] == 'wateringdurations/DELETE_ROW':
+        print(f'wateringdurations/DELETE_ROW ID = {action["payload"]}')
+        new_state = [[],[]]
+        for ind_c, column in enumerate(state):
+            for item in column:
+                if item['ID'][1] != action["payload"]:
+                    new_state[ind_c].append(item)
+        # print(f'new_state = {new_state}')
+        return new_state
     # elif action['type'] == 'wateringcycles/DELETE_ITEM':
     #     return state
     # elif action['type'] == 'wateringzones/ADD_ITEM':

@@ -29,7 +29,13 @@ def mw(store_):
             next_(action)
             if action['type'] == 'wateringzones/ADD_ITEM':
                 # print(get_state())
-                dispatch({'type': 'wateringdurations/ADD_ROW', 'payload': {'index': action['payload']['index']}})
+                dispatch({'type': 'wateringdurations/ADD_ROW',
+                          'payload': {'index': action['payload']['index'],
+                                      'zone_ID': action['payload']['new_item']['ID']}})
+            elif action['type'] == 'wateringzones/DELETE_ITEM':
+                dispatch({'type': 'wateringdurations/DELETE_ROW',
+                          'payload': action['payload']})
+
         return act
 
     return disp

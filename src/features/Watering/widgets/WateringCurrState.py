@@ -1,15 +1,15 @@
-from PyQt5.QtWidgets import QFrame, QLabel, QVBoxLayout, QHBoxLayout
+from PyQt5.QtWidgets import QFrame, QLabel, QVBoxLayout, QHBoxLayout, QWidget
 
 from src.store.store import ConnectedToStoreComponent
 
 
-class WateringCurrState(ConnectedToStoreComponent, QFrame):
+class WateringCurrState(ConnectedToStoreComponent, QWidget):
     def __init__(self, parent=None):
-        QFrame.__init__(self, parent)
+        QWidget.__init__(self, parent)
         ConnectedToStoreComponent.__init__(self)
 
-        self.setFrameStyle(QFrame.Panel | QFrame.Raised)
-        self.setStyleSheet("background-color: beige")
+        # self.setFrameStyle(QFrame.Panel | QFrame.Raised)
+        # self.setStyleSheet("background-color: beige")
 
         self._frm_curr_flow = QFrame()
         self._frm_curr_flow.setStyleSheet("background-color: rgb(193, 225, 211)")
