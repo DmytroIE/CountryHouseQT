@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QWidget, QHBoxLayout, QPushButton, QSpinBox, QLabel, QVBoxLayout
+from PyQt5.QtWidgets import QWidget, QHBoxLayout, QPushButton, QSpinBox, QLabel, QVBoxLayout, QDoubleSpinBox
 from shortid import ShortId
 
 from src.store.store import ConnectedToStoreComponent
@@ -7,7 +7,6 @@ from src.store.store import ConnectedToStoreComponent
 class WateringAddItem(ConnectedToStoreComponent, QWidget):
 
     def __init__(self, parent=None):
-
         QWidget.__init__(self, parent)
         ConnectedToStoreComponent.__init__(self)
 
@@ -19,7 +18,18 @@ class WateringAddItem(ConnectedToStoreComponent, QWidget):
         self._lyt_row1.setContentsMargins(2, 2, 2, 2)
 
         self._btn_add_zone = QPushButton('Добавить зону')
+        self._btn_add_zone.setProperty('class', 'StandardButton')
         self._btn_add_zone.clicked.connect(self._add_new_zone)
+
+        self._lbl_typ_flow = QLabel('Тип.расх., м3/ч')
+
+        self._dspb_typ_flow = QDoubleSpinBox()
+        self._dspb_typ_flow.setSingleStep(0.1)
+
+        self._lbl_gpio = QLabel('GPIO')
+
+        self._spb_gpio = QSpinBox()
+        self._spb_gpio.setRange(0, 31)
 
         self._lbl_new_zone_index = QLabel('Индекс вставки')
 
@@ -28,6 +38,10 @@ class WateringAddItem(ConnectedToStoreComponent, QWidget):
         self._spb_new_zone_index.setToolTip('Индекс вставки новой зоны')
 
         self._lyt_row1.addWidget(self._btn_add_zone, 1)
+        self._lyt_row1.addWidget(self._lbl_typ_flow)
+        self._lyt_row1.addWidget(self._dspb_typ_flow)
+        self._lyt_row1.addWidget(self._lbl_gpio)
+        self._lyt_row1.addWidget(self._spb_gpio)
         self._lyt_row1.addWidget(self._lbl_new_zone_index)
         self._lyt_row1.addWidget(self._spb_new_zone_index)
 
@@ -36,6 +50,7 @@ class WateringAddItem(ConnectedToStoreComponent, QWidget):
         self._lyt_row2.setContentsMargins(2, 2, 2, 2)
 
         self._btn_add_cycle = QPushButton('Добавить цикл')
+        self._btn_add_cycle.setProperty('class', 'StandardButton')
         # self._btn_add_zone.clicked.connect()
 
         self._lbl_new_cycle_index = QLabel('Индекс вставки')
@@ -54,13 +69,15 @@ class WateringAddItem(ConnectedToStoreComponent, QWidget):
         self._sid = ShortId()
 
     def _add_new_zone(self):
-        self._dispatch({'type': 'wateringzones/ADD_ITEM', 'payload': {'index': self._spb_new_zone_index.value(),
-                                                                      'new_item': {'ID': self._sid.generate(),
-                                                                                   'typ_flow': 1.2,
-                                                                                   'gpio_num': 0, 'enabled': False,
-                                                                                   'status': 3, 'progress': 0.0,
-                                                                                   'manu_mode_on': False,
-                                                                                   'manually_on': False}}})
+        self._dispatch({'type': 'wateringzones/ADD_ITEM',
+                        'payload': {'index': self._spb_new_zone_index.value(),
+                                    'new_item': {'ID': self._sid.generate(),
+                                                 'typ_flow': self._dspb_typ_flow.value(),
+                                                 'gpio_num': self._spb_gpio.value(),
+                                                 'enabled': False,
+                                                 'status': 0, 'progress': 0.0,
+                                                 'manu_mode_on': True,
+                                                 'manually_on': False}}})
 
     def _updater(self):
         pass

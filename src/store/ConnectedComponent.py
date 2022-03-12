@@ -67,7 +67,7 @@ class ConnectedComponent:
 
                     else:  # значит, изменился существующий элемент словаря, но количество элементов не поменялось
                         for key, _ in new_state.items():
-                            if self._cached[key] != new_state[key]:
+                            if self._cached[key] is not new_state[key]:
                                 self._on_state_update(new_state, key, action='UPDATE')
                 # --------------------------List---------------
                 elif isinstance(new_state, list):  # для однородного массива
@@ -97,13 +97,13 @@ class ConnectedComponent:
                                     index_in_prev_state)  # для существующих - индекс в старом состоянии
                             except ValueError:
                                 list_of_new_items.append({'index_of_new_item': ind})  # для новых сущностей - объект
-
+                                # с индексом в новом состоянии
                         self._on_state_update(new_state, list_of_new_items, action='ADD')
 
                     else:  # значит, изменился существующий элемент массива, но количество элементов не поменялось
                         list_of_updated_items = []
                         for ind, new_state_item in enumerate(new_state):
-                            if self._cached[ind] != new_state_item:
+                            if self._cached[ind] is not new_state_item:
                                 list_of_updated_items.append(new_state_item)
                             else:
                                 list_of_updated_items.append(None)

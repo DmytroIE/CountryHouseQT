@@ -3,6 +3,13 @@ from PyQt5.QtWidgets import QFrame, QHBoxLayout, QWidget
 from src.features.Watering.widgets.WateringCycle import WateringCycle
 from src.store.store import ConnectedToStoreComponent
 
+# def create_watering_cycle(ID, data, index, on_update, on_delete, parent):
+#     return WateringCycle(data={**data, 'number': index + 1},
+#                         on_update=lambda new_data: on_update(ID=ID, new_data=new_data),
+#                         on_delete=lambda: on_delete(ID=ID),
+#                         parent=parent)
+
+
 
 class WateringCycleList(ConnectedToStoreComponent, QWidget):
 

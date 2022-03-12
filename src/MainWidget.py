@@ -10,6 +10,25 @@ class MainWidget(QtWidgets.QWidget):
 
     def __init__(self, **kwargs):
         QtWidgets.QWidget.__init__(self)
+        self.setStyleSheet('.StandardButton {\
+                                         background-color: rgb(250,250,250);\
+                                         border-style: solid;\
+                                         border-width: 1px;\
+                                         border-radius: 4px;\
+                                         border-color: rgb(180,180,180);\
+                                         padding: 4px;\
+                                         }\
+                           .StandardButton:hover {\
+                                         border-color: rgb(190,250,210);\
+                                         background-color: rgb(200,230,240);\
+                                         }\
+                           .EnabledButton {\
+                                         border-color: rgb(150,225,211);\
+                                         background-color: rgb(193, 225, 211);\
+                                        }\
+                           .EnabledButton:hover{\
+                                          border-color: rgb(130,205,191);\
+                                          background-color: rgb(163, 195, 201);}')
 
         self._lyt_main = QtWidgets.QVBoxLayout(self)
         self._tab_main = QTabWidget(self)

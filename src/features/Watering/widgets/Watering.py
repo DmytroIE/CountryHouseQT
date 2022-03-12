@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QFrame, QGridLayout, QWidget
+from PyQt5.QtWidgets import QFrame, QGridLayout, QWidget, QLayout
 
 from src.features.Watering.widgets.WateringAddItem import WateringAddItem
 from src.features.Watering.widgets.WateringZoneList import WateringZoneList
@@ -32,7 +32,8 @@ class Watering(QWidget):
         self._lyt_main.addWidget(self._frm_durations, 1, 1)
         self._lyt_main.addWidget(self._wdg_add_item, 2, 0, 1, 2)
 
-        self._lyt_main.setSizeConstraint(1)
-        self.setMinimumSize(self.sizeHint())
+        self._lyt_main.setSizeConstraint(QLayout.SetFixedSize)
+        # https://stackoverflow.com/questions/14980620/qt-layout-resize-to-minimum-after-widget-size-changes
+
 
 
