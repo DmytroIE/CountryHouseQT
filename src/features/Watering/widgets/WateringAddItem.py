@@ -51,7 +51,7 @@ class WateringAddItem(ConnectedToStoreComponent, QWidget):
 
         self._btn_add_cycle = QPushButton('Добавить цикл')
         self._btn_add_cycle.setProperty('class', 'StandardButton')
-        # self._btn_add_zone.clicked.connect()
+        self._btn_add_cycle.clicked.connect(self._add_new_cycle)
 
         self._lbl_new_cycle_index = QLabel('Индекс вставки')
 
@@ -73,11 +73,18 @@ class WateringAddItem(ConnectedToStoreComponent, QWidget):
                         'payload': {'index': self._spb_new_zone_index.value(),
                                     'new_item': {'ID': self._sid.generate(),
                                                  'typ_flow': self._dspb_typ_flow.value(),
+                                                 'deviation': 10,
                                                  'gpio_num': self._spb_gpio.value(),
                                                  'enabled': False,
                                                  'status': 0, 'progress': 0.0,
-                                                 'manu_mode_on': True,
+                                                 'manu_mode_on': False,
                                                  'manually_on': False}}})
+
+    def _add_new_cycle(self):
+        self._dispatch({'type': 'wateringcycles/ADD_ITEM',
+                        'payload': {'index': self._spb_new_cycle_index.value(),
+                                    'new_item': {'ID': self._sid.generate(),
+                                                 'enabled': False, 'hour': 0, 'minute': 0}}})
 
     def _updater(self):
         pass

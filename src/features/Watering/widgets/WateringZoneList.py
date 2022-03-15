@@ -26,7 +26,6 @@ class WateringZoneList(ConnectedToStoreComponent, QWidget):
         self._children = []
 
         self._updater()
-        # print(f'sizehint = {self.sizeHint()}')
 
     def _on_delete_item(self, ID):
         self._dispatch({'type': 'wateringzones/DELETE_ITEM', 'payload': ID})
@@ -39,7 +38,6 @@ class WateringZoneList(ConnectedToStoreComponent, QWidget):
 
     def _on_state_update(self, new_state, list_, action):
         if action == 'ADD':
-            # print('ADD')
             for ind, item in enumerate(list_):
                 if isinstance(item, dict):
                     new_widget = create_watering_zone(
@@ -49,7 +47,6 @@ class WateringZoneList(ConnectedToStoreComponent, QWidget):
                         self._on_update_item,
                         self._on_delete_item,
                         self)
-
                     self._children.insert(item['index_of_new_item'], new_widget)
                 else:
                     self._children[ind].update_index(ind + 1)

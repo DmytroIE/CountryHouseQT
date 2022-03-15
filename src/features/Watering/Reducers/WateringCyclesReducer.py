@@ -1,6 +1,6 @@
 watering_cycles_initial = [
-    {'ID': 'CPyCGmQ0F', 'start': '06:00'},
-    {'ID': 'Lcli4yFwL', 'start': '20:00'}
+    {'ID': 'CPyCGmQ0F', 'enabled': False, 'hour': 6, 'minute': 0},
+    {'ID': 'Lcli4yFwL', 'enabled': False, 'hour': 20, 'minute': 0}
 ]
 
 
@@ -10,6 +10,7 @@ def watering_cycles_reducer(state=None, action=None):
     if action['type'] == 'wateringcycles/ADD_ITEM':
         new_state = state.copy()
         new_state.insert(action['payload']['index'], action['payload']['new_item'])
+        # print(f'new_state = {new_state}')
         return new_state
     elif action['type'] == 'wateringcycles/DELETE_ITEM':
         number_of_deleted_item = -1
@@ -24,13 +25,15 @@ def watering_cycles_reducer(state=None, action=None):
             return state
     elif action['type'] == 'wateringcycles/UPDATE_ITEM':
         number_of_updated_item = -1
+        # print('up')
         for ind, item in enumerate(state):
             if item['ID'] == action['payload']['ID']:
                 number_of_updated_item = ind
         if number_of_updated_item > -1:
             new_state = state.copy()
-            new_state[number_of_updated_item] = action['payload']['updated_item']
-            # print(f'new_state = {new_state}')
+            item_state = state[number_of_updated_item].copy()
+            new_state[number_of_updated_item] = {**item_state, **(action['payload']['new_data'])}
+            # print(new_state)
             return new_state
         else:
             return state

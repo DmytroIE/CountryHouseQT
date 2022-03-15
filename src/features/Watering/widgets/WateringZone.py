@@ -72,7 +72,7 @@ class WateringZone(QFrame):
 
         self._btn_del = QPushButton('DEL')
         self._btn_del.setProperty('class', 'StandardButton')
-        self._btn_del.setFixedWidth(40)
+        # self._btn_del.setFixedWidth(40)
         self._btn_del.clicked.connect(on_delete)
 
         self._lyt_layer2.addWidget(self._lbl_typ_flow)
@@ -88,7 +88,7 @@ class WateringZone(QFrame):
 
         # -----------Main Layout--------------
         self._btn_name = QPushButton()
-        self._btn_name.setFixedWidth(70)
+        # self._btn_name.setFixedWidth(70)
         # self._btn_name.setProperty('class', 'StandardButton')
         self._btn_name.clicked.connect(lambda: on_update(new_data={'enabled': not self._cached['enabled']}))
 
@@ -119,7 +119,6 @@ class WateringZone(QFrame):
         self._btn_name.setText(f'Зона {ind}')
 
     def apply_updates(self, new_data):
-        # self._btn_name.setText(f'Зона {new_data["number"]}')
         self._lbl_typ_flow.setText(f'Тип.расх. {round(new_data["typ_flow"], 1)} м3/ч')
         self._spb_deviation.setValue(new_data['deviation'])
         self._lbl_gpio.setText(f'GPIO {new_data["gpio_num"]}')
@@ -137,4 +136,5 @@ class WateringZone(QFrame):
                                 self._btn_manually_on,
                                 'StandardButton',
                                 'StandardButton EnabledButton')
-        self._cached = new_data
+        for key in self._cached:
+            self._cached[key] = new_data[key]
