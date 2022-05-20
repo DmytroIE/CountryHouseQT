@@ -3,3 +3,4 @@ OFF = 0
 PENDING = 1
 IN_WORK = 2
 FAULTY = 3
+RUN_OUT = 4

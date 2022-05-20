@@ -1,6 +1,6 @@
 watering_cycles_initial = [
-    {'ID': 'CPyCGmQ0F', 'enabled': False, 'hour': 6, 'minute': 0},
-    {'ID': 'Lcli4yFwL', 'enabled': False, 'hour': 20, 'minute': 0}
+    {'ID': 'CPyCGmQ0F', 'enabled': False, 'hour': 6, 'minute': 0, 'on': False},
+    {'ID': 'Lcli4yFwL', 'enabled': False, 'hour': 20, 'minute': 0, 'on': False}
 ]
 
 

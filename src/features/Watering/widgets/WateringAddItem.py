@@ -75,7 +75,7 @@ class WateringAddItem(ConnectedToStoreComponent, QWidget):
                                                  'typ_flow': self._dspb_typ_flow.value(),
                                                  'deviation': 10,
                                                  'gpio_num': self._spb_gpio.value(),
-                                                 'enabled': False,
+                                                 'enabled': True, 'on': False,
                                                  'status': 0, 'progress': 0.0,
                                                  'manu_mode_on': False,
                                                  'manually_on': False}}})
@@ -84,7 +84,7 @@ class WateringAddItem(ConnectedToStoreComponent, QWidget):
         self._dispatch({'type': 'wateringcycles/ADD_ITEM',
                         'payload': {'index': self._spb_new_cycle_index.value(),
                                     'new_item': {'ID': self._sid.generate(),
-                                                 'enabled': False, 'hour': 0, 'minute': 0}}})
+                                                 'enabled': False, 'hour': 0, 'minute': 0, 'on': False}}})
 
     def _updater(self):
         pass

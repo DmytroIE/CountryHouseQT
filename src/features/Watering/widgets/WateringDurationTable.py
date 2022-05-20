@@ -27,8 +27,8 @@ class WateringDurationTable(ConnectedToStoreComponent, QWidget):
         for ind_c, item_c in enumerate(self._cached):
             for ind_z, item_z in enumerate(self._cached[ind_c]):
                 # print(f'ind_c={ind_c}, ind_z={ind_z}')
-                item = self._cached[ind_c][ind_z]
-                self._children[ind_c][ind_z] = create_watering_duration(item['ID'], item, self._on_update_item, self)
+                # item = self._cached[ind_c][ind_z]
+                self._children[ind_c][ind_z] = create_watering_duration(item_z['ID'], item_z, self._on_update_item, self)
                 self._lyt_main.addWidget(self._children[ind_c][ind_z], ind_z, ind_c)
         # print(self._children)
 

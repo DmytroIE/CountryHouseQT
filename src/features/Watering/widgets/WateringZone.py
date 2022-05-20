@@ -136,5 +136,9 @@ class WateringZone(QFrame):
                                 self._btn_manually_on,
                                 'StandardButton',
                                 'StandardButton EnabledButton')
+        if new_data['on']:
+            self._btn_next_layer.setStyleSheet('background-color: rgb(193, 225, 211)')
+        else:
+            self._btn_next_layer.setStyleSheet('background-color: rgb(255, 255, 255)')
         for key in self._cached:
             self._cached[key] = new_data[key]
