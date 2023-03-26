@@ -1,6 +1,9 @@
+from src.utils.WateringStatuses import *
+
+
 watering_cycles_initial = [
-    {'ID': 'CPyCGmQ0F', 'enabled': False, 'hour': 6, 'minute': 0, 'on': False},
-    {'ID': 'Lcli4yFwL', 'enabled': False, 'hour': 20, 'minute': 0, 'on': False}
+    {'ID': 'CPyCGmQ0F', 'enabled': True, 'hour': 6, 'minute': 0, 'status': WateringCycleStatuses.PENDING},
+    {'ID': 'Lcli4yFwL', 'enabled': True, 'hour': 20, 'minute': 0, 'status': WateringCycleStatuses.PENDING}
 ]
 
 

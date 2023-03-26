@@ -1,27 +1,15 @@
 from PyQt5.QtCore import QTimer, QTime
 
 from src.store.store import ConnectedToStoreComponent
+from src.controller.GpioBoard import GpioBoard
 
 from src.utils.WateringStatuses import *
-
-
-class GPIO_board():
-    def __init__(self, settings):
-        # self._watering_valves = {1: {'number':17, 'open': False}}
-        pass
-
-    def open_watering_valve(self, zone_id, is_open):
-        # if open == True
-        pass
-
-    def open_ball_valve(self, is_open):
-        pass
 
 
 class Controller(ConnectedToStoreComponent):
     def __init__(self):
         ConnectedToStoreComponent.__init__(self)
-        self._gpio = GPIO_board(None)
+        self._gpio = GpioBoard(None)
         self._watering_started = False
         self._watering_step = 0
         self._watering_zone_on_index = 0
@@ -43,7 +31,6 @@ class Controller(ConnectedToStoreComponent):
         self._watering()
         pass
 
-
     def _watering(self):
         cycles = self._get_store_state()['watering']['cycles']
         zones = self._get_store_state()['watering']['zones']
@@ -53,99 +40,86 @@ class Controller(ConnectedToStoreComponent):
 
         curr_time = QTime.currentTime()
 
-        match self._watering_step:
-            case 0:
-                # если есть хотя бы одна зона, включенная в ручном режиме, то плановый полив отменяется,
-                # потому что нельзя два клапана открыть одновременно
-                for zone in zones:
-                    if zone['manu_mode_on'] and zone['manually_on']:
-                        return
-                # переходы
-                for ind_c, cycle in enumerate(cycles):
-                    if cycle.get('enabled') \
-                            and cycle.get('hour') == curr_time.hour() \
-                            and cycle.get('minute') == curr_time.minute():
+        if self._watering_step == 0:
+            # переходы
+            for ind_c, cycle in enumerate(cycles):
+                if cycle.get('enabled') \
+                        and cycle.get('hour') == curr_time.hour() \
+                        and cycle.get('minute') == curr_time.minute():
 
-                        # if self._switch_to_next_zone():
-                        for ind_z, zone in enumerate(zones):
-                            if zone['enabled'] and not zone['on']:
-                                self._dispatch({'type': 'wateringzones/UPDATE_ITEM',
-                                                'payload': {'ID': zone.get('ID'),
-                                                            'new_data': {'on': True, 'status': IN_WORK}}})
-                                self._gpio.open_watering_valve(zone.get('ID'), True)
-                                self._watering_zone_on_index = ind_z
-                                self._time_of_finishing_zone = \
-                                    QTime.currentTime().addSecs(
-                                        durations[self._watering_cycle_on_index][self._watering_zone_on_index].get(
-                                            'duration') * 60)
-                                self._dispatch({'type': 'wateringcycles/UPDATE_ITEM',
-                                                'payload': {'ID': cycle.get('ID'),
-                                                            'new_data': {'on': True}}})
-                                self._watering_cycle_on_index = ind_c
-                                self._gpio.open_ball_valve(True)
-                                self._gpio.open_watering_valve(zone.get('ID'), True)
-
-                                self._watering_step = 1
-                                print('Step1')
-                                break
-
-            case 1:
-
-                duration_in_secs = durations[self._watering_cycle_on_index][self._watering_zone_on_index].get(
-                    'duration') * 60
-                seconds_left = curr_time.secsTo(self._time_of_finishing_zone)
-                progress = (duration_in_secs - seconds_left)/duration_in_secs * 100.0
-                self._dispatch({'type': 'wateringzones/UPDATE_ITEM',
-                                'payload': {'ID': zones[self._watering_zone_on_index].get('ID'),
-                                            'new_data': {'progress': progress}}})
-
-                # переходы
-
-                if seconds_left <= 0:
-                    next_watering_zone_on_index = -1
                     for ind_z, zone in enumerate(zones):
-                        if zone['enabled'] and ind_z > self._watering_zone_on_index:
-                            next_watering_zone_on_index = ind_z
+                        if zone['enabled'] and not zone['on']:
+                            self._dispatch({'type': 'wateringzones/UPDATE_ITEM',
+                                            'payload': {'ID': zone.get('ID'),
+                                                        'new_data': {'on': True, 'status': IN_WORK}}})
+                            self._gpio.open_watering_valve(zone.get('ID'), True)
+                            self._watering_zone_on_index = ind_z
+                            self._time_of_finishing_zone = \
+                                QTime.currentTime().addSecs(
+                                    durations[self._watering_cycle_on_index][self._watering_zone_on_index].get(
+                                        'duration') * 60)
+                            self._dispatch({'type': 'wateringcycles/UPDATE_ITEM',
+                                            'payload': {'ID': cycle.get('ID'),
+                                                        'new_data': {'on': True}}})
+                            self._watering_cycle_on_index = ind_c
+                            self._gpio.open_ball_valve(True)
+                            self._gpio.open_watering_valve(zone.get('ID'), True)
+                            self._watering_step = 1
+                            print('Step1')
                             break
-                    if next_watering_zone_on_index >= 0:
-                        self._dispatch({'type': 'wateringzones/UPDATE_ITEM',
-                                'payload': {'ID': zones[self._watering_zone_on_index]['ID'],
-                                            'new_data': {'on': False, 'status': PENDING}}})
-                        self._gpio.open_watering_valve(zones[self._watering_zone_on_index]['ID'], False)
 
-                        self._watering_zone_on_index = next_watering_zone_on_index
-                        self._watering_step = 2
-                        print('Step2')
-
-                    else:
-                        # иначе не закрываем последний клапан, закрываем шаровый и сбрасываем давление 60 сек
-                        self._gpio.open_ball_valve(False)
-                        self._time_of_finishing_runout = curr_time.addSecs(60)
-                        self._watering_step = 3  # сбрасываем давление
-                        print('Step3')
-            case 2:  # задержка 1 сек между переключениями клапанов
-                self._dispatch({'type': 'wateringzones/UPDATE_ITEM',
-                                'payload': {'ID': zones[self._watering_zone_on_index]['ID'],
-                                            'new_data': {'on': True, 'status': IN_WORK}}})
-                self._gpio.open_watering_valve(zones[self._watering_zone_on_index]['ID'], True)
-                self._time_of_finishing_zone = \
-                    QTime.currentTime().addSecs(
-                        durations[self._watering_cycle_on_index][self._watering_zone_on_index].get(
-                            'duration') * 60)
-                self._watering_step = 1
-                print('Step1')
-            case 3:
-                seconds_left = curr_time.secsTo(self._time_of_finishing_runout)
-                if seconds_left <= 0:
+        elif self._watering_step == 1:
+            duration_in_secs = durations[self._watering_cycle_on_index][self._watering_zone_on_index].get(
+                'duration') * 60
+            seconds_left = curr_time.secsTo(self._time_of_finishing_zone)
+            progress = (duration_in_secs - seconds_left) / duration_in_secs * 100.0
+            self._dispatch({'type': 'wateringzones/UPDATE_ITEM',
+                            'payload': {'ID': zones[self._watering_zone_on_index].get('ID'),
+                                        'new_data': {'progress': progress}}})
+            # переходы
+            if seconds_left <= 0:
+                next_watering_zone_on_index = -1
+                for ind_z, zone in enumerate(zones):
+                    if zone['enabled'] and ind_z > self._watering_zone_on_index:
+                        next_watering_zone_on_index = ind_z
+                        break
+                if next_watering_zone_on_index >= 0:
                     self._dispatch({'type': 'wateringzones/UPDATE_ITEM',
                                     'payload': {'ID': zones[self._watering_zone_on_index]['ID'],
                                                 'new_data': {'on': False, 'status': PENDING}}})
                     self._gpio.open_watering_valve(zones[self._watering_zone_on_index]['ID'], False)
-                    self._watering_zone_on_index = 0
-                    self._watering_step = 0
-                    print('Step0')
-            case _:
+                    self._watering_zone_on_index = next_watering_zone_on_index
+                    self._watering_step = 2
+                    print('Step2')
+                else:
+                    # иначе не закрываем последний клапан, закрываем шаровый и сбрасываем давление 60 сек
+                    self._gpio.open_ball_valve(False)
+                    self._time_of_finishing_runout = curr_time.addSecs(60)
+                    self._watering_step = 3  # сбрасываем давление
+                    print('Step3')
+        elif self._watering_step == 2:  # задержка 1 сек между переключениями клапанов
+            self._dispatch({'type': 'wateringzones/UPDATE_ITEM',
+                            'payload': {'ID': zones[self._watering_zone_on_index]['ID'],
+                                        'new_data': {'on': True, 'status': IN_WORK}}})
+            self._gpio.open_watering_valve(zones[self._watering_zone_on_index]['ID'], True)
+            self._time_of_finishing_zone = \
+                QTime.currentTime().addSecs(
+                    durations[self._watering_cycle_on_index][self._watering_zone_on_index].get(
+                        'duration') * 60)
+            self._watering_step = 1
+            print('Step1')
+        elif self._watering_step == 3:
+            seconds_left = curr_time.secsTo(self._time_of_finishing_runout)
+            if seconds_left <= 0:
+                self._dispatch({'type': 'wateringzones/UPDATE_ITEM',
+                                'payload': {'ID': zones[self._watering_zone_on_index]['ID'],
+                                            'new_data': {'on': False, 'status': PENDING}}})
+                self._gpio.open_watering_valve(zones[self._watering_zone_on_index]['ID'], False)
+                self._watering_zone_on_index = 0
                 self._watering_step = 0
+                print('Step0')
+        else:
+            self._watering_step = 0
 
     def _update_flowrate_reading(self):
         pass

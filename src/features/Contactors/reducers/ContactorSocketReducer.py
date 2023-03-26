@@ -2,29 +2,19 @@ from src.utils.WateringStatuses import *
 
 socket_default = {
     'run request': False,
-    'req conf': OnOffDevConfs.CONF_STOP,
-    'available': AvailabilityStatuses.YES,
-    'on': False,
-    'status': OnOffDeviceStatuses.OK
+    'req conf': OnOffDevConfirmations.STOP,
+    'available': True,
+    'status': OnOffDeviceStatuses.PENDING,
+    'enabled': True,
+    'ackn': False
 }
 
 
-def light_reducer(state=None, action=None):
+def contactor_light_reducer(state=None, action=None):
     if state is None:
         state = socket_default
-    if action['type'] == 'socket/RUN_REQ':
+    if action['type'] == 'socket/UPDATE':
         new_state = state.copy()
-        new_state = {**new_state, **{'run request': action['payload']}}
+        new_state = {**new_state, **action['payload']}
         return new_state
-    if action['type'] == 'socket/CHANGE_CONF':
-        new_state = state.copy()
-        new_state = {**new_state, **{'req conf': action['payload']}}
-        return new_state
-    if action['type'] == 'socket/CHANGE_AVAIL':
-        new_state = state.copy()
-        new_state = {**new_state, **{'available': action['payload']}}
-        return new_state
-    if action['type'] == 'socket/ENABLE':
-        new_state = state.copy()
-        new_state = {**new_state, **{'enabled': action['payload']}}
-        return new_state
+

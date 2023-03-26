@@ -19,7 +19,7 @@ class WateringZone(QFrame):
         self.setFrameStyle(QFrame.Panel | QFrame.Raised)
         self.setFixedHeight(50)
 
-        self._cached = {'enabled': False, 'manu_mode_on': False, 'manually_on': False}
+        self._cached = {'enabled': False}
 
         self._lyt_main = QHBoxLayout(self)
         self._lyt_main.setContentsMargins(2, 2, 2, 2)
@@ -40,18 +40,18 @@ class WateringZone(QFrame):
         self._bar_progress.setTextVisible(True)
         self._lyt_layer1.addWidget(self._bar_progress)
 
-        self._btn_manu_mode_on = QPushButton('Р.реж.')
-        # self._btn_manu_mode_on.setProperty('class', 'StandardButton')
-        self._btn_manu_mode_on.setFixedWidth(65)
-        self._btn_manu_mode_on.clicked.connect(
-            lambda: on_update(new_data={'manu_mode_on': not self._cached['manu_mode_on']}))
-        self._lyt_layer1.addWidget(self._btn_manu_mode_on)
-
-        self._btn_manually_on = QPushButton('Вкл. в р.')
-        self._btn_manually_on.setFixedWidth(65)
-        self._btn_manually_on.clicked.connect(
-            lambda: on_update(new_data={'manually_on': not self._cached['manually_on']}))
-        self._lyt_layer1.addWidget(self._btn_manually_on)
+        # self._btn_manu_mode_on = QPushButton('Р.реж.')
+        # # self._btn_manu_mode_on.setProperty('class', 'StandardButton')
+        # self._btn_manu_mode_on.setFixedWidth(65)
+        # self._btn_manu_mode_on.clicked.connect(
+        #     lambda: on_update(new_data={'manu_mode_on': not self._cached['manu_mode_on']}))
+        # self._lyt_layer1.addWidget(self._btn_manu_mode_on)
+        #
+        # self._btn_manually_on = QPushButton('Вкл. в р.')
+        # self._btn_manually_on.setFixedWidth(65)
+        # self._btn_manually_on.clicked.connect(
+        #     lambda: on_update(new_data={'manually_on': not self._cached['manually_on']}))
+        # self._lyt_layer1.addWidget(self._btn_manually_on)
 
         # ----------Layer 2--------------------
         self._wdg_layer2 = QWidget()
@@ -128,15 +128,7 @@ class WateringZone(QFrame):
                                 self._btn_name,
                                 'StandardButton',
                                 'StandardButton EnabledButton')
-        changeToggleButtonStyle(new_data['manu_mode_on'],
-                                self._btn_manu_mode_on,
-                                'StandardButton',
-                                'StandardButton EnabledButton')
-        changeToggleButtonStyle(new_data['manually_on'],
-                                self._btn_manually_on,
-                                'StandardButton',
-                                'StandardButton EnabledButton')
-        if new_data['on']:
+        if new_data['valve on']:
             self._btn_next_layer.setStyleSheet('background-color: rgb(193, 225, 211)')
         else:
             self._btn_next_layer.setStyleSheet('background-color: rgb(255, 255, 255)')
