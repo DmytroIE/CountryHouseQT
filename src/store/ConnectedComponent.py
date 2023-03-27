@@ -58,17 +58,17 @@ class ConnectedComponent:
 
                     # print('мы в _updater в части для словарей, diff_add = {diff_add}')
                     if diff_delete:  # если стало меньше записей
-                        for key in diff_delete:
-                            self._on_state_update(new_state, key, action='DELETE')
+                        self._on_state_update(new_state, list(diff_delete), action='DELETE')
 
                     elif diff_add:  # если стало больше записей
-                        for key in diff_add:
-                            self._on_state_update(new_state, key, action='ADD')
+                        self._on_state_update(new_state, list(diff_add), action='ADD')
 
                     else:  # значит, изменился существующий элемент словаря, но количество элементов не поменялось
+                        updated_keys_list = []
                         for key, _ in new_state.items():
-                            if self._cached[key] is not new_state[key]:
-                                self._on_state_update(new_state, key, action='UPDATE')
+                            if self._cached[key] is not new_state[key]:  # спорная штука, но is более универсальный, чем ==
+                                updated_keys_list.append(key)
+                        self._on_state_update(new_state, updated_keys_list, action='UPDATE')
                 # --------------------------List---------------
                 elif isinstance(new_state, list):  # для однородного массива
                     # здесь также три варианта - добавился элемент в массив,
@@ -103,7 +103,7 @@ class ConnectedComponent:
                     else:  # значит, изменился существующий элемент массива, но количество элементов не поменялось
                         list_of_updated_items = []
                         for ind, new_state_item in enumerate(new_state):
-                            if self._cached[ind] is not new_state_item:
+                            if self._cached[ind] is not new_state_item: # спорная штука, но is более универсальный, чем ==
                                 list_of_updated_items.append(new_state_item)
                             else:
                                 list_of_updated_items.append(None)

@@ -124,7 +124,7 @@ class WateringZone(QFrame):
         self._lbl_gpio.setText(f'GPIO {new_data["gpio_num"]}')
         self._lbl_status.setText(f'{statuses[new_data["status"]]}')
         self._bar_progress.setValue(int(new_data['progress']))
-        changeToggleButtonStyle(new_data['enabled'],
+        change_toggle_button_style(new_data['enabled'],
                                 self._btn_name,
                                 'StandardButton',
                                 'StandardButton EnabledButton')
