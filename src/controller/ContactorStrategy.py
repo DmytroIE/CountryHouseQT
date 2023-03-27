@@ -6,41 +6,35 @@ from src.utils.WateringStatuses import *
 SP_DELAY = 5  # in seconds
 
 
-class ContactorUnivPumpStates(Enum):
+class ContactorStates(Enum):
     PENDING = 0
     CHECKING_AVAILABILITY = 1
     STARTUP = 100
     RUN = 10
-    # DONE = 200
-    # RUNNING_DISRUPTED = 201
     SHUTDOWN = 200
     SHUTDOWN_ERROR = 290
 
 
-class ContactorUnivPumpAlarmMessages(Enum):
-    NO_FEEDBACK_WHEN_RUN = {'ID': 'tCoPB053',
-                            'text': Template('Авария контактора насоса $name'),
+class ContactorAlarmMessages(Enum):
+    NO_FEEDBACK_WHEN_RUN = {'ID': 'rF0b0Aq_',
+                            'text': Template('Авария контактора $name'),
                             'active': False}
-    CANT_STOP_CONTACTOR = {'ID': 'oC1wQuu5',
-                           'text': Template('Невозможно отключить контактор насоса $name'),
+    CANT_STOP_CONTACTOR = {'ID': '9JUl1EB5',
+                           'text': Template('Невозможно отключить контактор $name'),
                            'active': False}
 
 
-def contactor_univ_pump_strategy(contactor):
-    pump_id = contactor['ID']
+def contactor_strategy(contactor):
+    cont_id = contactor['ID']
     name = contactor['name']
     ackn = contactor['ackn']
     error = contactor['error']
     feedback = contactor['feedback']
-    feedback_for_watering = contactor['feedback for watering']
     contactor_feedback = contactor['contactor feedback']
     enabled = contactor['enabled']
-    enabled_for_watering = contactor['enabled for watering']
     run_request = contactor['run request']
-    run_request_for_watering = contactor['run request for watering']
     available = contactor['available']
-    available_for_watering = contactor['available for watering']
-    pump_on = contactor['pump on']
+    cont_on = contactor['cont on']
     timer_init_time = contactor['timer init time']
     curr_state = contactor['curr state']
     prev_state = contactor['prev state']
@@ -51,10 +45,10 @@ def contactor_univ_pump_strategy(contactor):
     if ackn:
         if error:
             error = False
-            poss_error = ContactorUnivPumpAlarmMessages.NO_FEEDBACK_WHEN_RUN
+            poss_error = ContactorAlarmMessages.NO_FEEDBACK_WHEN_RUN
             poss_error.value['active'] = False
             alarm_log_batch.append({'type': LogAlarmMessageTypes.ERROR_OUT,
-                                    'ID': pump_id + poss_error.value['ID'],
+                                    'ID': cont_id + poss_error.value['ID'],
                                     'dt_stamp': QDateTime.currentDateTime(),
                                     'text': poss_error.value['text'].substitute(name=name)})
         ackn = False
@@ -63,80 +57,66 @@ def contactor_univ_pump_strategy(contactor):
     while True:
         again = False
 
-        if curr_state is ContactorUnivPumpStates.PENDING:
-            prev_state_temp = prev_state
+        if curr_state is ContactorStates.PENDING:
+            # prev_state_temp = prev_state
             # Единоразовые действия при входе в шаг
             if curr_state is not prev_state:
-                if prev_state is not ContactorUnivPumpStates.CHECKING_AVAILABILITY:
+                if prev_state is not ContactorStates.CHECKING_AVAILABILITY:
+                    poss_warning = ContactorAlarmMessages.CANT_STOP_CONTACTOR
+                    if poss_warning.value['active']:
+                        poss_warning.value['active'] = False
+                        alarm_log_batch.append({'type': LogAlarmMessageTypes.WARNING_OUT,
+                                                'ID': cont_id + poss_warning.value['ID'],
+                                                'dt_stamp': QDateTime.currentDateTime(),
+                                                'text': poss_warning.value['text'].substitute(name=name)})
                     alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
                                             'dt_stamp': QDateTime.currentDateTime(),
                                             'text': f'Контактор насоса {name} отключен'})
-                if run_request:
-                    feedback = OnOffDevFeedbacks.NOT_RUN
-                else:
-                    feedback = OnOffDevFeedbacks.STOP
-                if run_request_for_watering:
-                    feedback_for_watering = OnOffDevFeedbacks.NOT_RUN
-                else:
-                    feedback_for_watering = OnOffDevFeedbacks.STOP
+                feedback = OnOffDevFeedbacks.STOP
                 prev_state = curr_state
 
             # Переходы
-            if prev_state_temp is ContactorUnivPumpStates.CHECKING_AVAILABILITY:
-                curr_state = ContactorUnivPumpStates.CHECKING_AVAILABILITY
-                again = False
-            else:
-                curr_state = ContactorUnivPumpStates.CHECKING_AVAILABILITY
-                again = True
-
-        elif curr_state is ContactorUnivPumpStates.CHECKING_AVAILABILITY:
-            # Этот шаг исполняется один раз
-            prev_state = curr_state
-
-            if available:
-                if not enabled:
-                    available = False
-            else:
-                if enabled and not error:
-                    available = True
-
-            if available_for_watering:
-                if not enabled_for_watering:
-                    available_for_watering = False
-            else:
-                if enabled_for_watering and not error:
-                    available_for_watering = True
-
-            # Переходы
-            if (available and run_request) or \
-                    (available_for_watering and run_request_for_watering):
-                poss_warning = ContactorUnivPumpAlarmMessages.CANT_STOP_CONTACTOR
-                if poss_warning.value['active']:
-                    poss_warning.value['active'] = False
-                    alarm_log_batch.append({'type': LogAlarmMessageTypes.WARNING_OUT,
-                                            'ID': pump_id + poss_warning.value['ID'],
-                                            'dt_stamp': QDateTime.currentDateTime(),
-                                            'text': poss_warning.value['text'].substitute(name=name)})
-                curr_state = ContactorUnivPumpStates.STARTUP
+            if available and run_request:
+                curr_state = ContactorStates.STARTUP
                 again = True
             elif contactor_feedback:
-                curr_state = ContactorUnivPumpStates.SHUTDOWN_ERROR
+                curr_state = ContactorStates.SHUTDOWN_ERROR
                 again = True
             else:
-                curr_state = ContactorUnivPumpStates.PENDING
-                again = True
+                curr_state = ContactorStates.CHECKING_AVAILABILITY
+                again = False
 
-        elif curr_state is ContactorUnivPumpStates.STARTUP:
+        elif curr_state is ContactorStates.CHECKING_AVAILABILITY:
+            # Этот шаг исполняется один раз
+
+            if not enabled or error:
+                available = False
+            else:
+                available = True
+
+            # Переходы
+            curr_state = prev_state
+            prev_state = ContactorStates.CHECKING_AVAILABILITY
+            again = True
+
+        elif curr_state is ContactorStates.STARTUP:
             # Единоразовые действия при входе в шаг
             if curr_state is not prev_state:
-                alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
-                                        'text': f'Запуск контактора насоса {name}'})
-                pump_on = True
-                feedback = OnOffDevFeedbacks.PENDING
-                feedback_for_watering = OnOffDevFeedbacks.PENDING
-                state_entry_time = QTime.currentTime()
-                timer_init_time = None
+                if prev_state is not ContactorStates.CHECKING_AVAILABILITY:
+                    poss_warning = ContactorAlarmMessages.CANT_STOP_CONTACTOR
+                    if poss_warning.value['active']:
+                        poss_warning.value['active'] = False
+                        alarm_log_batch.append({'type': LogAlarmMessageTypes.WARNING_OUT,
+                                                'ID': cont_id + poss_warning.value['ID'],
+                                                'dt_stamp': QDateTime.currentDateTime(),
+                                                'text': poss_warning.value['text'].substitute(name=name)})
+                    alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
+                                            'dt_stamp': QDateTime.currentDateTime(),
+                                            'text': f'Запуск контактора {name}'})
+                    cont_on = True
+                    feedback = OnOffDevFeedbacks.PENDING
+                    state_entry_time = QTime.currentTime()
+                    timer_init_time = None
                 prev_state = curr_state
 
             # Постоянные действия
@@ -150,54 +130,48 @@ def contactor_univ_pump_strategy(contactor):
                     timer_init_time = None
 
             # Переходы
-            if (not run_request) and (not run_request_for_watering):
-                curr_state = ContactorUnivPumpStates.SHUTDOWN
+            if not run_request:
+                curr_state = ContactorStates.SHUTDOWN
                 again = True
-            elif (not enabled) and (not enabled_for_watering):
+            elif not available:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
                                         'dt_stamp': QDateTime.currentDateTime(),
-                                        'text': f'Насос {name} отключен во время запуска'})
-                available = False
-                available_for_watering = False
-                curr_state = ContactorUnivPumpStates.SHUTDOWN
+                                        'text': f'Контактор {name} отключен во время запуска'})
+                curr_state = ContactorStates.SHUTDOWN
                 again = True
             elif timer_init_time and timer_init_time.secsTo(curr_time) > SP_DELAY:
-                curr_error = ContactorUnivPumpAlarmMessages.NO_FEEDBACK_WHEN_RUN
+                curr_error = ContactorAlarmMessages.NO_FEEDBACK_WHEN_RUN
                 curr_error.value['active'] = True
                 alarm_log_batch.append({'type': LogAlarmMessageTypes.ERROR_IN,
-                                        'ID': pump_id + curr_error.value['ID'],
+                                        'ID': cont_id + curr_error.value['ID'],
                                         'dt_stamp': QDateTime.currentDateTime(),
                                         'text': curr_error.value['text'].substitute(name=name)})
                 error = True
                 available = False
-                available_for_watering = False
-                curr_state = ContactorUnivPumpStates.SHUTDOWN
+                curr_state = ContactorStates.SHUTDOWN
                 again = True
             elif contactor_feedback and \
                     state_entry_time.secsTo(QTime.currentTime()) > 2:
                 # специальная задержка, чтобы побыть какое-то время в этом состоянии
-                curr_state = ContactorUnivPumpStates.RUN
+                curr_state = ContactorStates.RUN
                 again = True
+            else:
+                curr_state = ContactorStates.CHECKING_AVAILABILITY
+                again = False
 
-        elif curr_state is ContactorUnivPumpStates.RUN:
+        elif curr_state is ContactorStates.RUN:
             # Единоразовые действия при входе в шаг
             if curr_state is not prev_state:
-                alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
-                                        'text': f'Контактор насоса {name} запущен'})
-                timer_init_time = None
+                if prev_state is not ContactorStates.CHECKING_AVAILABILITY:
+                    alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
+                                            'dt_stamp': QDateTime.currentDateTime(),
+                                            'text': f'Контактор насоса {name} запущен'})
+                    feedback = OnOffDevFeedbacks.RUN
+
+                    timer_init_time = None
                 prev_state = curr_state
 
             # Постоянные действия
-            if run_request:
-                feedback = OnOffDevFeedbacks.RUN
-            else:
-                feedback = OnOffDevFeedbacks.NOT_STOP
-            if run_request_for_watering:
-                feedback_for_watering = OnOffDevFeedbacks.RUN
-            else:
-                feedback_for_watering = OnOffDevFeedbacks.NOT_STOP
-
             curr_time = QTime.currentTime()
             if not contactor_feedback:
                 if not timer_init_time:
@@ -207,47 +181,40 @@ def contactor_univ_pump_strategy(contactor):
                     timer_init_time = None
 
             # Переходы
-            if (not run_request) and (not run_request_for_watering):
-                curr_state = ContactorUnivPumpStates.SHUTDOWN
+            if not run_request:
+                curr_state = ContactorStates.SHUTDOWN
                 again = True
-            elif (not enabled) and run_request and not available_for_watering:
+            elif not available:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
                                         'dt_stamp': QDateTime.currentDateTime(),
                                         'text': f'Насос {name} отключен во время работы'})
-                available = False
-                curr_state = ContactorUnivPumpStates.SHUTDOWN
-                again = True
-            elif (not enabled_for_watering) and run_request_for_watering and not available:
-                alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
-                                        'text': f'Насос {name} отключен во время работы'})
-                available_for_watering = False
-                curr_state = ContactorUnivPumpStates.SHUTDOWN
+                curr_state = ContactorStates.SHUTDOWN
                 again = True
             elif timer_init_time and timer_init_time.secsTo(curr_time) > SP_DELAY:
-                curr_error = ContactorUnivPumpAlarmMessages.NO_FEEDBACK_WHEN_RUN
+                curr_error = ContactorAlarmMessages.NO_FEEDBACK_WHEN_RUN
                 curr_error.value['active'] = True
                 alarm_log_batch.append({'type': LogAlarmMessageTypes.ERROR_IN,
-                                        'ID': pump_id + curr_error.value['ID'],
+                                        'ID': cont_id + curr_error.value['ID'],
                                         'dt_stamp': QDateTime.currentDateTime(),
                                         'text': curr_error.value['text'].substitute(name=name)})
                 error = True
                 available = False
-                available_for_watering = False
-                curr_state = ContactorUnivPumpStates.SHUTDOWN
+                curr_state = ContactorStates.SHUTDOWN
                 again = True
+            else:
+                curr_state = ContactorStates.CHECKING_AVAILABILITY
+                again = False
 
-        elif curr_state is ContactorUnivPumpStates.SHUTDOWN:
+        elif curr_state is ContactorStates.SHUTDOWN:
             # Единоразовые действия при входе в шаг
             if curr_state is not prev_state:
-                alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
-                                        'text': f'Отключение контактора насоса {name}'})
-                pump_on = False
-                feedback = OnOffDevFeedbacks.PENDING
-                feedback_for_watering = OnOffDevFeedbacks.PENDING
-                # state_entry_time = QTime.currentTime()
-                timer_init_time = None
+                if prev_state is not ContactorStates.CHECKING_AVAILABILITY:
+                    alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
+                                            'dt_stamp': QDateTime.currentDateTime(),
+                                            'text': f'Отключение контактора {name}'})
+                    cont_on = False
+                    feedback = OnOffDevFeedbacks.PENDING
+                    timer_init_time = None
                 prev_state = curr_state
 
             # Постоянные действия
@@ -260,46 +227,47 @@ def contactor_univ_pump_strategy(contactor):
                     timer_init_time = None
 
             # Переходы
-            if (run_request and available) or (run_request_for_watering and available_for_watering):
-                curr_state = ContactorUnivPumpStates.STARTUP
+            if run_request and available:
+                curr_state = ContactorStates.STARTUP
                 again = True
             elif timer_init_time and timer_init_time.secsTo(curr_time) > SP_DELAY:
-                curr_state = ContactorUnivPumpStates.SHUTDOWN_ERROR
+                curr_state = ContactorStates.SHUTDOWN_ERROR
                 again = True
             elif not contactor_feedback:
-                curr_state = ContactorUnivPumpStates.PENDING
+                curr_state = ContactorStates.PENDING
                 again = True
+            else:
+                curr_state = ContactorStates.CHECKING_AVAILABILITY
+                again = False
 
-        elif curr_state is ContactorUnivPumpStates.SHUTDOWN_ERROR:
-            prev_state_temp = prev_state
+        elif curr_state is ContactorStates.SHUTDOWN_ERROR:
+
             if curr_state is not prev_state:
-                curr_error = ContactorUnivPumpAlarmMessages.CANT_STOP_CONTACTOR
-                if not curr_error.value['active']:
-                    curr_error.value['active'] = True
-                    alarm_log_batch.append({'type': LogAlarmMessageTypes.WARNING_IN,
-                                            'ID': pump_id + curr_error.value['ID'],
-                                            'dt_stamp': QDateTime.currentDateTime(),
-                                            'text': curr_error.value['text'].substitute(name=name)})
-                    if run_request:
-                        feedback = OnOffDevFeedbacks.RUN
-                    else:
-                        feedback = OnOffDevFeedbacks.NOT_STOP
-                    if run_request_for_watering:
-                        feedback_for_watering = OnOffDevFeedbacks.RUN
-                    else:
-                        feedback_for_watering = OnOffDevFeedbacks.NOT_STOP
+                if prev_state is not ContactorStates.CHECKING_AVAILABILITY:
+                    curr_error = ContactorAlarmMessages.CANT_STOP_CONTACTOR
+                    if not curr_error.value['active']:
+                        curr_error.value['active'] = True
+                        alarm_log_batch.append({'type': LogAlarmMessageTypes.WARNING_IN,
+                                                'ID': cont_id + curr_error.value['ID'],
+                                                'dt_stamp': QDateTime.currentDateTime(),
+                                                'text': curr_error.value['text'].substitute(name=name)})
                 prev_state = curr_state
 
+            if run_request:
+                feedback = OnOffDevFeedbacks.RUN
+            else:
+                feedback = OnOffDevFeedbacks.NOT_STOP
+
             # Переходы
-            if prev_state_temp is ContactorUnivPumpStates.CHECKING_AVAILABILITY:
-                curr_state = ContactorUnivPumpStates.SHUTDOWN_ERROR
-                again = False
-            elif run_request or run_request_for_watering:
-                curr_state = ContactorUnivPumpStates.CHECKING_AVAILABILITY
+            if run_request and available:
+                curr_state = ContactorStates.STARTUP
                 again = True
             elif not contactor_feedback:
-                curr_state = ContactorUnivPumpStates.PENDING
+                curr_state = ContactorStates.PENDING
                 again = True
+            else:
+                curr_state = ContactorStates.CHECKING_AVAILABILITY
+                again = False
 
         if not again:
             break
@@ -308,11 +276,9 @@ def contactor_univ_pump_strategy(contactor):
     return {'ackn': ackn,
             'error': error,
             'feedback': feedback,
-            'feedback for watering': feedback_for_watering,
             'contactor feedback': contactor_feedback,
             'available': available,
-            'available for watering': available_for_watering,
-            'pump on': pump_on,
+            'cont on': cont_on,
             'timer init time': timer_init_time,
             'curr state': curr_state,
             'prev state': prev_state,
@@ -328,8 +294,9 @@ if __name__ == '__main__':
     from src.store.ConnectedComponent import ConnectedComponent
     from src.utils.Buttons import *
 
-    keys_to_print = ['error', 'feedback', 'feedback for watering', 'available', 'available for watering',
-                     'pump on', 'curr state', 'prev state', 'timer init time']
+    keys_to_print = ['error', 'feedback', 'available',
+                     'cont on', 'curr state', 'prev state', 'timer init time']
+
 
     class MainWindow(ConnectedComponent, QMainWindow):
         def __init__(self, store1):
@@ -337,7 +304,6 @@ if __name__ == '__main__':
             ConnectedComponent.__init__(self, store1)
 
             self._create_ui()
-
             self._updater()
 
         def _get_own_state(self):  # selector
@@ -394,18 +360,6 @@ if __name__ == '__main__':
                                                      'StandardButton',
                                                      'StandardButton EnabledButton')
 
-            self._btn_enable_for_w = QPushButton('Enable for w')
-            self._btn_enable_for_w.clicked.connect(
-                lambda: self._dispatch({'type': 'pump/UPDATE',
-                                        'payload':
-                                            {'enabled for watering': not self._get_own_state()['enabled for watering']}
-                                        }))
-            self._updated_widgets_map['enabled for watering'] = \
-                lambda x: change_toggle_button_style(x,
-                                                     self._btn_enable_for_w,
-                                                     'StandardButton',
-                                                     'StandardButton EnabledButton')
-
             self._btn_run = QPushButton('Run')
             self._btn_run.clicked.connect(
                 lambda: self._dispatch({'type': 'pump/UPDATE',
@@ -415,19 +369,6 @@ if __name__ == '__main__':
             self._updated_widgets_map['run request'] = \
                 lambda x: change_toggle_button_style(x,
                                                      self._btn_run,
-                                                     'StandardButton',
-                                                     'StandardButton EnabledButton')
-
-            self._btn_run_for_w = QPushButton('Run for w')
-            self._btn_run_for_w.clicked.connect(
-                lambda: self._dispatch({'type': 'pump/UPDATE',
-                                        'payload':
-                                            {'run request for watering':
-                                                 not self._get_own_state()['run request for watering']}
-                                        }))
-            self._updated_widgets_map['run request for watering'] = \
-                lambda x: change_toggle_button_style(x,
-                                                     self._btn_run_for_w,
                                                      'StandardButton',
                                                      'StandardButton EnabledButton')
 
@@ -457,9 +398,7 @@ if __name__ == '__main__':
 
             self._lyt_first = QHBoxLayout()
             self._lyt_first.addWidget(self._btn_enable)
-            self._lyt_first.addWidget(self._btn_enable_for_w)
             self._lyt_first.addWidget(self._btn_run)
-            self._lyt_first.addWidget(self._btn_run_for_w)
 
             self._lyt_second = QHBoxLayout()
             self._lyt_second.addWidget(self._btn_cont_fdbk)
@@ -473,7 +412,8 @@ if __name__ == '__main__':
 
             self.setCentralWidget(self._wdg_central)
 
-    class PumpController(ConnectedComponent):
+
+    class ContController(ConnectedComponent):
         def __init__(self, store1):
             ConnectedComponent.__init__(self, store1)
             self._one_second_timer = QTimer()
@@ -482,7 +422,10 @@ if __name__ == '__main__':
 
         def _on_timer_tick(self):
             state = self._get_store_state()
-            new_state_chunk, batch = contactor_univ_pump_strategy(state)
+            try:
+                new_state_chunk, batch = contactor_strategy(state)
+            except Exception as e:
+                print(f'Ошибка выполнения автомата, {e}')
             self._dispatch({'type': 'pump/UPDATE', 'payload': new_state_chunk})
             for item in batch:
                 print(f'{item["dt_stamp"].toString("dd.MM.yy mm:ss")} {item["text"]}')
@@ -491,23 +434,20 @@ if __name__ == '__main__':
         def _updater(self):
             pass
 
+
     init_state = {'ID': '3265',
                   'name': 'Pump',
                   'ackn': False,
                   'error': False,
                   'feedback': OnOffDevFeedbacks.STOP,
-                  'feedback for watering': OnOffDevFeedbacks.STOP,
                   'contactor feedback': False,
                   'enabled': True,
-                  'enabled for watering': True,
                   'run request': False,
-                  'run request for watering': False,
                   'available': True,
-                  'available for watering': True,
-                  'pump on': False,
+                  'cont on': False,
                   'timer init time': None,
-                  'curr state': ContactorUnivPumpStates.PENDING,
-                  'prev state': ContactorUnivPumpStates.PENDING,
+                  'curr state': ContactorStates.CHECKING_AVAILABILITY,
+                  'prev state': ContactorStates.PENDING,
                   'state entry time': None
                   }
 
@@ -530,7 +470,7 @@ if __name__ == '__main__':
     app = QApplication([])
 
     window = MainWindow(store)
-    controller = PumpController(store)
+    controller = ContController(store)
 
     window.show()
 
