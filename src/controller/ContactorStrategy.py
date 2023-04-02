@@ -7,7 +7,7 @@ SP_DELAY = 5  # in seconds
 
 
 class States(Enum):
-    PENDING = 0
+    STANDBY = 0
     CHECK_AVAILABILITY = 1
     STARTUP = 2
     RUN = 3
@@ -22,10 +22,6 @@ class ErrorMessages(Enum):
 
 class WarningMessages(Enum):
     CANT_STOP_CONTACTOR = Template('Невозможно отключить контактор $name')
-
-
-# contactor_error_map = {'rF0b0Aq_': Template('Авария контактора $name')}
-# contactor_warning_map = {'9JUl1EB5': Template('Невозможно отключить контактор $name')}
 
 
 def contactor_strategy(contactor):
@@ -46,6 +42,7 @@ def contactor_strategy(contactor):
     state_entry_time = contactor['state entry time']
     raised_errors = contactor['raised errors']
     raised_warnings = contactor['raised warnings']
+    status = contactor['status']
     alarm_log_batch = []
 
     # Квитирование
@@ -69,7 +66,7 @@ def contactor_strategy(contactor):
     while True:
         again = False
 
-        if curr_state is States.PENDING:
+        if curr_state is States.STANDBY:
             # Единоразовые действия при входе в шаг
             if curr_state is not prev_state:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
@@ -107,11 +104,11 @@ def contactor_strategy(contactor):
                                         'dt_stamp': QDateTime.currentDateTime(),
                                         'text': f'Запуск контактора {name}'})
                 cont_on = True
-                feedback = OnOffDevFeedbacks.PENDING
                 state_entry_time = QTime.currentTime()
                 prev_state = curr_state
 
             # Постоянные действия
+            feedback = OnOffDevFeedbacks.PENDING
 
             # Переходы
             if not run_request:
@@ -213,17 +210,20 @@ def contactor_strategy(contactor):
                                         'dt_stamp': QDateTime.currentDateTime(),
                                         'text': f'Отключение контактора {name}'})
                 cont_on = False
-                feedback = OnOffDevFeedbacks.PENDING
+                state_entry_time = QTime.currentTime()
                 prev_state = curr_state
 
             # Постоянные действия
+            feedback = OnOffDevFeedbacks.PENDING
 
             # Переходы
             if run_request and available:
                 curr_state = States.STARTUP
                 again = True
-            elif not contactor_feedback:
-                curr_state = States.PENDING
+            elif not contactor_feedback and \
+                    state_entry_time.secsTo(QTime.currentTime()) > 2:
+                # специальная задержка, чтобы побыть какое-то время в этом состоянии
+                curr_state = States.STANDBY
                 again = True
             else:
                 curr_state = States.CHECK_IF_DEVICES_STOPPED
@@ -289,11 +289,25 @@ def contactor_strategy(contactor):
         if not again:
             break
 
+    # статусы
+    if prev_state is States.STANDBY:
+        if error:
+            status = OnOffDeviceStatuses.FAULTY
+        elif not available:
+            status = OnOffDeviceStatuses.OFF
+        else:
+            status = OnOffDeviceStatuses.STANDBY
+    elif prev_state is States.STARTUP:
+        status = OnOffDeviceStatuses.STARTUP
+    elif prev_state is States.RUN:
+        status = OnOffDeviceStatuses.RUN
+    elif prev_state is States.SHUTDOWN:
+        status = OnOffDeviceStatuses.SHUTDOWN
+
     # обновляем выходы
     return {'ackn': ackn,
             'error': error,
             'feedback': feedback,
-            'contactor feedback': contactor_feedback,
             'available': available,
             'cont on': cont_on,
             'cont no fdbk timer': cont_no_fdbk_timer,
@@ -302,12 +316,13 @@ def contactor_strategy(contactor):
             'prev state': prev_state,
             'state entry time': state_entry_time,
             'raised errors': raised_errors,
-            'raised warnings': raised_warnings
+            'raised warnings': raised_warnings,
+            'status': status
             }, alarm_log_batch
 
 
 if __name__ == '__main__':
-    from PyQt5.QtCore import QSize, Qt, QTimer
+    from PyQt5.QtCore import QTimer
     from PyQt5.QtWidgets import \
         QApplication, QMainWindow, QPushButton, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QTextBrowser
     import pydux
@@ -316,7 +331,7 @@ if __name__ == '__main__':
 
     keys_to_print = ['error', 'feedback', 'available',
                      'cont on', 'curr state', 'prev state', 'cont no fdbk timer', 'cont fdbk not off timer',
-                     'raised errors', 'raised warnings']
+                     'status']
 
 
     class MainWindow(ConnectedComponent, QMainWindow):
@@ -444,13 +459,12 @@ if __name__ == '__main__':
         def _on_timer_tick(self):
             state = self._get_store_state()
             try:
-                new_state_chunk, batch = contactor_strategy(state)
+                new_state_chunk, alarm_log_batch = contactor_strategy(state)
+                self._dispatch({'type': 'pump/UPDATE', 'payload': new_state_chunk})
+                for item in alarm_log_batch:
+                    print(f'{item["dt_stamp"].toString("dd.MM.yy mm:ss")} {item["text"]}')
             except Exception as e:
                 print(f'Ошибка выполнения автомата, {e}')
-            self._dispatch({'type': 'pump/UPDATE', 'payload': new_state_chunk})
-            for item in batch:
-                print(f'{item["dt_stamp"].toString("dd.MM.yy mm:ss")} {item["text"]}')
-            # self._dispatch({'type': 'pump/UPDATE', 'payload': {'timer init time': QTime.currentTime()}})
 
         def _updater(self):
             pass
@@ -469,10 +483,11 @@ if __name__ == '__main__':
                   'cont no fdbk timer': None,
                   'cont fdbk not off timer': None,
                   'curr state': States.CHECK_AVAILABILITY,
-                  'prev state': States.PENDING,
+                  'prev state': States.STANDBY,
                   'state entry time': None,
                   'raised errors': {ErrorMessages.NO_FEEDBACK_WHEN_RUN: False},
-                  'raised warnings': {WarningMessages.CANT_STOP_CONTACTOR: False}
+                  'raised warnings': {WarningMessages.CANT_STOP_CONTACTOR: False},
+                  'status': OnOffDeviceStatuses.STANDBY
                   }
 
 

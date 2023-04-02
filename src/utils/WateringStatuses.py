@@ -3,17 +3,17 @@ from string import Template
 
 
 OFF = 0
-PENDING = 1
+STANDBY = 1
 IN_WORK = 2
 FAULTY = 3
 RUN_OUT = 4
 
-statuses = {OFF: "Выключен", PENDING: "В ожидании", IN_WORK: "В работе", FAULTY: "Неисправность", RUN_OUT: "Выбег"}
+statuses = {OFF: "Выключен", STANDBY: "В ожидании", IN_WORK: "В работе", FAULTY: "Неисправность", RUN_OUT: "Выбег"}
 
 
 class OnOffDeviceStatuses(Enum):
-    # OFF = 'Выключен'
-    PENDING = 'В ожидании'
+    OFF = 'Выключен'
+    STANDBY = 'В ожидании'
     STARTUP = 'Запуск'
     RUN = 'Работа'
     SHUTDOWN = 'Выключение'
@@ -29,16 +29,17 @@ class OnOffDevFeedbacks(Enum):
 
 
 class ExecDevFeedbacks(Enum):
+    FINISHED = 0
     BUSY = 1
-    ERROR = 2
-    DONE = 3
+    DONE = 2
+    ERROR = 3
     ABORTED = 4
     # READY = 5
 
 
 class WateringStatuses(Enum):
     # OFF = 'Выключен'
-    PENDING = 'В ожидании'
+    STANDBY = 'В ожидании'
     STARTUP = 'Запуск'
     RUN = 'Работа'
     SHUTDOWN = 'Выключение'
@@ -47,14 +48,14 @@ class WateringStatuses(Enum):
 
 class WateringZoneStatuses(Enum):
     # OFF = 'Выключен'
-    PENDING = 'В ожидании'
+    STANDBY = 'В ожидании'
     RUN = 'Работа'
     FAULTY = 'Неисправность'
 
 
 class WateringCycleStatuses(Enum):
     # OFF = 'Выключен'
-    PENDING = 'В ожидании'
+    STANDBY = 'В ожидании'
     RUN = 'Работа'
 
 
