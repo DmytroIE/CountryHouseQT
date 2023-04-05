@@ -1,403 +1,506 @@
-from PyQt5.QtCore import QTimer, QTime, QDate
-# from enum import IntEnum
-from src.store.store import ConnectedToStoreComponent
+from PyQt5.QtCore import QTime, QDateTime
+from collections import OrderedDict
 from src.utils.WateringStatuses import *
 
+watering_durations_initial = OrderedDict({
+    'CPyCGmQ0F': OrderedDict({'LZliGv4F': 15,
+                              'FclCGDyZx': 15,
+                              'iPyLGSJbx': 15,
+                              'Fcyi4kPtV': 15,
+                              'iBwi42jQ1': 15}),
+    'Lcli4yFwL': OrderedDict({'LZliGv4F': 15,
+                              'FclCGDyZx': 15,
+                              'iPyLGSJbx': 15,
+                              'Fcyi4kPtV': 15,
+                              'iBwi42jQ1': 15})
+})
+
+watering_zones_initial = OrderedDict({
+    'LZliGv4F': {'gpio_num': 13,
+                 'name': 'Зона 1',
+                 'ackn': False,
+                 'error': False,
+                 'feedback': ExecDevFeedbacks.FINISHED,
+                 'enabled': True,
+                 'exec request': False,
+                 'available': True,
+                 'valve on': False,
+                 'curr flowrate': 0.0,
+                 'hi lim flowrate': 1.6,
+                 'lo lim flowrate': 0.4,
+                 'duration': 1,
+                 'progress': 0.0,
+                 'flowrate hi timer': None,
+                 'flowrate lo timer': None,
+                 'curr state': ZoneStates.CHECK_AVAILABILITY,
+                 'prev state': ZoneStates.STANDBY,
+                 'state entry time': None,
+                 'raised errors': {ZoneErrorMessages.HIGH_FLOWRATE: False},
+                 'raised warnings': {ZoneWarningMessages.LOW_FLOWRATE: False},
+                 'status': OnOffDeviceStatuses.STANDBY},
+    'FclCGDyZx': {'gpio_num': 14,
+                  'name': 'Зона 2',
+                  'ackn': False,
+                  'error': False,
+                  'feedback': ExecDevFeedbacks.FINISHED,
+                  'enabled': True,
+                  'exec request': False,
+                  'available': True,
+                  'valve on': False,
+                  'curr flowrate': 0.0,
+                  'hi lim flowrate': 1.6,
+                  'lo lim flowrate': 0.4,
+                  'duration': 1,
+                  'progress': 0.0,
+                  'flowrate hi timer': None,
+                  'flowrate lo timer': None,
+                  'curr state': ZoneStates.CHECK_AVAILABILITY,
+                  'prev state': ZoneStates.STANDBY,
+                  'state entry time': None,
+                  'raised errors': {ZoneErrorMessages.HIGH_FLOWRATE: False},
+                  'raised warnings': {ZoneWarningMessages.LOW_FLOWRATE: False},
+                  'status': OnOffDeviceStatuses.STANDBY
+                  },
+    'iPyLGSJbx': {'gpio_num': 15,
+                  'name': 'Зона 3',
+                  'ackn': False,
+                  'error': False,
+                  'feedback': ExecDevFeedbacks.FINISHED,
+                  'enabled': True,
+                  'exec request': False,
+                  'available': True,
+                  'valve on': False,
+                  'curr flowrate': 0.0,
+                  'hi lim flowrate': 1.6,
+                  'lo lim flowrate': 0.4,
+                  'duration': 1,
+                  'progress': 0.0,
+                  'flowrate hi timer': None,
+                  'flowrate lo timer': None,
+                  'curr state': ZoneStates.CHECK_AVAILABILITY,
+                  'prev state': ZoneStates.STANDBY,
+                  'state entry time': None,
+                  'raised errors': {ZoneErrorMessages.HIGH_FLOWRATE: False},
+                  'raised warnings': {ZoneWarningMessages.LOW_FLOWRATE: False},
+                  'status': OnOffDeviceStatuses.STANDBY
+                  },
+    'Fcyi4kPtV': {'gpio_num': 16,
+                  'name': 'Зона 4',
+                  'ackn': False,
+                  'error': False,
+                  'feedback': ExecDevFeedbacks.FINISHED,
+                  'enabled': True,
+                  'exec request': False,
+                  'available': True,
+                  'valve on': False,
+                  'curr flowrate': 0.0,
+                  'hi lim flowrate': 1.6,
+                  'lo lim flowrate': 0.4,
+                  'duration': 1,
+                  'progress': 0.0,
+                  'flowrate hi timer': None,
+                  'flowrate lo timer': None,
+                  'curr state': ZoneStates.CHECK_AVAILABILITY,
+                  'prev state': ZoneStates.STANDBY,
+                  'state entry time': None,
+                  'raised errors': {ZoneErrorMessages.HIGH_FLOWRATE: False},
+                  'raised warnings': {ZoneWarningMessages.LOW_FLOWRATE: False},
+                  'status': OnOffDeviceStatuses.STANDBY
+                  },
+    'iBwi42jQ1': {'gpio_num': 17,
+                  'name': 'Палисадник',
+                  'ackn': False,
+                  'error': False,
+                  'feedback': ExecDevFeedbacks.FINISHED,
+                  'enabled': True,
+                  'exec request': False,
+                  'available': True,
+                  'valve on': False,
+                  'curr flowrate': 0.0,
+                  'hi lim flowrate': 1.6,
+                  'lo lim flowrate': 0.4,
+                  'duration': 1,
+                  'progress': 0.0,
+                  'flowrate hi timer': None,
+                  'flowrate lo timer': None,
+                  'curr state': ZoneStates.CHECK_AVAILABILITY,
+                  'prev state': ZoneStates.STANDBY,
+                  'state entry time': None,
+                  'raised errors': {ZoneErrorMessages.HIGH_FLOWRATE: False},
+                  'raised warnings': {ZoneWarningMessages.LOW_FLOWRATE: False},
+                  'status': OnOffDeviceStatuses.STANDBY
+                  }
+})
+
+watering_cycles_initial = OrderedDict({
+    'CPyCGmQ0F': {'enabled': True,
+                  'hour': 6,
+                  'minute': 0,
+                  'status': OnOffDeviceStatuses.STANDBY},
+    'Lcli4yFwL': {'enabled': True,
+                  'hour': 20,
+                  'minute': 0,
+                  'status': OnOffDeviceStatuses.STANDBY}
+})
+
+PRESSURE_RELIEF_DURATION = 1  # minutes
 
 
+def watering_strategy(watering, zones, pump):
+    watering_id = watering['ID']
+    ackn = watering['ackn']
+    error = watering['error']
+    feedback = watering['feedback']
+    available = watering['available']
+    ball_valve_on = watering['ball valve on']
+    act_cycle = watering['act cycle']  # Вместо exec request, если не None, то это сигнал к запуску
+    active_zone_id = ['active zone id']
+    curr_state = watering['curr state']
+    prev_state = watering['prev state']
+    state_entry_time = watering['state entry time']
+    raised_errors = watering['raised errors']
+    raised_warnings = watering['raised warnings']
+    status = watering['status']
+    pump_outputs = {'run req from watering': pump['run req from watering']}
 
+    zones_outputs = {}
+    for zone_id, zone in zones:
+        zones_outputs[zone_id] = {'exec request': zone['exec request'],
+                                  'duration': zone['duration']}
+    alarm_log_batch = []
 
+    # Квитирование
+    if ackn:
+        if error:
+            error_test = False
+            for key, val in raised_errors.items():
+                if key is WateringErrorMessages.PUMP_NOT_RUNNING:
+                    if val:
+                        if pump['available']:
+                            raised_errors[key] = False
+                            alarm_log_batch.append({'type': LogAlarmMessageTypes.ERROR_OUT,
+                                                    'alarm ID': key,
+                                                    'equip ID': watering_id,
+                                                    'dt_stamp': QDateTime.currentDateTime(),
+                                                    'text': 'OUT:' + key.value})
+                        else:
+                            error_test = True
+            error = error_test
+        # проверяем все подчиненные устройства, обнулили ли они свои биты квитирования
+        all_devices_acknowledged = True
+        for zone in zones:
+            if zone['ackn']:
+                all_devices_acknowledged = False
+        if pump['ackn']:
+            all_devices_acknowledged = False
+        if all_devices_acknowledged:
+            ackn = False
 
+    # Автомат
+    while True:
+        again = False
 
-class WateringStates(IntEnum):
-    PENDING = 0
-    CHECKING_READYBILITY = 1
-    CHECKING = 2
-    START_PUMP = 100
-    OPEN_BALL_VALVE = 101
-    WATERING_ZONE = 10
-    SWITCHING_ANOTHER_ZONE = 11
-    RUNNING_OUT = 200
+        if curr_state is WateringStates.CHECK_AVAILABILITY:
+            # Этот шаг исполняется один раз
 
+            at_least_one_zone_available = True
+            for zone in zones:
+                at_least_one_zone_available = zone['available']
 
-class WateringStrategy(ConnectedToStoreComponent):
-    def __init__(self):
-        ConnectedToStoreComponent.__init__(self)
+            if not at_least_one_zone_available \
+                    or not pump['available'] \
+                    or error:
+                available = False
+            else:
+                available = True
 
-        self._run_signal = False
-        self._curr_state = WateringStates.PENDING
-        self._prev_state = WateringStates.PENDING
-        self._act_zone_index = 0
-        self._act_cycle_index = 0
-        self._act_zone = None
-        self._act_cycle = None
+            # Переходы
+            curr_state = prev_state
+            again = True
 
+        elif curr_state is WateringStates.CHECK_IF_DEVICES_STOPPED:
+            # Здесь этот шаг просто для проформы, чтобы все было единообразно
+            # Переходы
+            curr_state = WateringStates.CHECK_IF_DEVICES_RUNNING
+            again = True
 
-        self._again = False
+        elif curr_state is WateringStates.CHECK_IF_DEVICES_RUNNING:
+            # Переходы
+            error_test = False
+            for key, val in raised_errors.items():
+                if key is WateringErrorMessages.PUMP_NOT_RUNNING:
+                    if pump_outputs['run req from watering'] and \
+                            pump['feedback for watering'] is OnOffDevFeedbacks.NOT_RUN:
+                        raised_errors[key] = True
+                        alarm_log_batch.append({'type': LogAlarmMessageTypes.ERROR_IN,
+                                                'alarm ID': key,
+                                                'equip ID': watering_id,
+                                                'dt_stamp': QDateTime.currentDateTime(),
+                                                'text': 'IN:' + key.value})
+                        error_test = True
+            if error_test:
+                error = True
+                available = False
+                # feedback = ExecDevFeedbacks.ABORTED
+                curr_state = prev_state  # WateringStates.CLOSE_BALL_VALVE
+                again = True
+            else:
+                curr_state = ZoneStates.CHECK_AVAILABILITY
+                again = False
 
-        # self._one_second_timer = QTimer()
-        # self._one_second_timer.timeout.connect(self._on_timer_tick)
-        # self._one_second_timer.start(1000)
+        elif curr_state is WateringStates.STANDBY:
+            # Единоразовые действия при входе в шаг
+            if curr_state is not prev_state:
+                alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
+                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'text': f'Полив завершен'})
+                prev_state = curr_state
 
-    def _on_timer_tick(self):
-        cycles = self._get_store_state()['watering']['cycles']
-        zones = self._get_store_state()['watering']['zones']
-        durations = self._get_store_state()['watering']['durations']
-        current = self._get_store_state()['watering']['current']
-        pump = self._get_store_state()['contactors']['pump']
-        # Текущее время - нужно во многих местах
-        curr_time = QTime.currentTime()
-        # Строка с временем и датой - нужна для сообщений в лог
-        timestamp = f'{QDate.currentDate().toString("dd.MM.yy")} {curr_time.toString("hh:mm")}'
+            # Постоянные действия
+            feedback = ExecDevFeedbacks.FINISHED
 
-        # Квитирование
-        if current['ackn']:
-            if not pump['available'] and pump['ackn']:
+            # Переходы
+            if available and act_cycle:
+                curr_state = WateringStates.START_PUMP
+                again = True
+            else:
+                curr_state = WateringStates.CHECK_IF_DEVICES_STOPPED
+                again = True
 
+        elif curr_state is WateringStates.START_PUMP:
+            # Единоразовые действия при входе в шаг
+            if curr_state is not prev_state:
+                pump_outputs['run req from watering'] = True
+                feedback = ExecDevFeedbacks.BUSY
+                state_entry_time = QTime.currentTime()
+                prev_state = curr_state
 
+            # Постоянные действия
 
+            # Переходы
+            if not available or not act_cycle:
+                alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
+                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'text': f'Полив отменен при запуске'})
+                feedback = ExecDevFeedbacks.ABORTED
+                curr_state = WateringStates.STOP_PUMP
+                again = True
+            elif pump['feedback for watering'] is OnOffDevFeedbacks.RUN and \
+                    state_entry_time.secsTo(QTime.currentTime()) > 5:
+                # специальная задержка, чтобы побыть какое-то время в этом состоянии
+                curr_state = WateringStates.OPEN_BALL_VALVE
+                again = True
+            else:
+                curr_state = WateringStates.CHECK_IF_DEVICES_STOPPED
+                again = True
 
+        elif curr_state is WateringStates.OPEN_BALL_VALVE:
+            # Единоразовые действия при входе в шаг
+            if curr_state is not prev_state:
+                ball_valve_on = True
+                state_entry_time = QTime.currentTime()
+                prev_state = curr_state
 
+            # Постоянные действия
 
-            # сбрасываем имп сигнал, блок его получил, принял к сведению
-            self._dispatch({'type': 'wateringcommon/UPDATE',
-                            'payload': {'ackn': False, 'available': True}})
+            # Переходы
+            if not available or not act_cycle:
+                alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
+                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'text': f'Полив отменен при запуске'})
+                feedback = ExecDevFeedbacks.ABORTED
+                curr_state = WateringStates.SHUTDOWN
+                again = True
+            elif state_entry_time.secsTo(QTime.currentTime()) > 5:
+                # специальная задержка, чтобы побыть какое-то время в этом состоянии
+                curr_state = WateringStates.WATER_ZONE
+                again = True
+            else:
+                curr_state = WateringStates.CHECK_IF_DEVICES_STOPPED
+                again = True
 
-        # Автомат
-        while True:
-            self._again = False
-            if self._curr_state is WateringStates.PENDING:
-                # Единоразовые действия при входе в шаг
-                if self._curr_state is not self._prev_state:
-                    if pump['run request']:
-                        self._dispatch({'type': 'pump/UPDATE',
-                                        'payload': {'run request': False}})
-                    if current['ball valve on']:
-                        self._dispatch({'type': 'wateringcommon/UPDATE',
-                                        'payload': {'ball valve on': False}})
-                    if self._act_zone:
-                        # Выключаем активную зону
-                        self._dispatch({'type': 'wateringzones/UPDATE_ITEM',
-                                        'payload': {'ID': self._act_zone['ID'],
-                                                    'new_data': {'on': False, 'status': WateringZoneStatuses.PENDING}}})
-                        self._act_zone = None
-                        self._act_zone_index = 0
-                    self._prev_state = self._curr_state
+        elif curr_state is WateringStates.WATER_ZONE:
+            # Единоразовые действия при входе в шаг
+            if curr_state is not prev_state:
+                active_zone_id = None
+                for zone_id, zone in zones:
+                    if zone['available']:
+                        if zone['feedback'] is ExecDevFeedbacks.FINISHED and not active_zone_id:
+                            zones_outputs[zone_id]['exec request'] = True
+                            zones_outputs[zone_id]['duration'] = act_cycle[active_zone_id]
+                            active_zone_id = zone_id
+                prev_state = curr_state
 
-                # Переходы
-                self._curr_state = WateringStates.CHECKING_READYBILITY
-                self._again = True
+            # Постоянные действия
 
-            elif self._curr_state is WateringStates.CHECKING_READYBILITY:
-                # Единоразовые действия при входе в шаг
-                if self._curr_state is not self._prev_state:
-                    self._prev_state = self._curr_state
+            # Переходы
+            if not active_zone_id:
+                alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
+                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'text': f'Полив выполнен'})
+                feedback = ExecDevFeedbacks.DONE
+                for zone_id, zone in zones:
+                    zones_outputs[zone_id]['exec request'] = False
+                curr_state = WateringStates.CLOSE_BALL_VALVE
+                again = True
+            elif not available or not act_cycle:
+                alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
+                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'text': f'Полив отменен'})
+                for zone_id, zone in zones:
+                    zones_outputs[zone_id]['exec request'] = False
+                feedback = ExecDevFeedbacks.ABORTED
+                curr_state = WateringStates.CLOSE_BALL_VALVE
+                again = True
 
-                ready = False
+            elif zones[active_zone_id]['feedback'] is ExecDevFeedbacks.DONE or \
+                    zones[active_zone_id]['feedback'] is ExecDevFeedbacks.ABORTED:
+                curr_state = WateringStates.CHANGE_ZONE
+                again = True
+            else:
+                curr_state = WateringStates.CHECK_IF_DEVICES_STOPPED
+                again = True
 
+        elif curr_state is WateringStates.CHANGE_ZONE:
+            # Единоразовые действия при входе в шаг
+            if curr_state is not prev_state:
+                state_entry_time = QTime.currentTime()
+                prev_state = curr_state  # Нужно, чтобы опять прийти в WateringStates.WATER_ZONE и выполнить един дей
 
-                # Переходы
-                if current['exec request'] and not current['abort']:
-                    self._curr_state = WateringStates.CHECKING
-                    self._again = True
-                else:
-                    self._curr_state = WateringStates.PENDING
-                    self._again = False  # (!!!!!)
+            # Постоянные действия
 
-            elif self._curr_state is WateringStates.CHECKING:
-                # Единоразовые действия при входе в шаг
-                if self._curr_state is not self._prev_state:
-                    # сбрасываем имп сигнал, блок его получил, принял к сведению
-                    self._dispatch({'type': 'wateringcommon/UPDATE',
-                                    'payload': {'exec request': False}})
-                    self._prev_state = self._curr_state
+            # Переходы
+            if state_entry_time.secsTo(QTime.currentTime()) > 2:
+                # специальная задержка, чтобы побыть какое-то время в этом состоянии
+                curr_state = WateringStates.WATER_ZONE
+                again = True
+            else:
+                curr_state = WateringStates.CHECK_IF_DEVICES_STOPPED
+                again = True
 
-                for ind_z, zone in enumerate(zones):
-                    # обнуляем прогрессы перед следующим поливом
-                    self._dispatch({'type': 'wateringzones/UPDATE_ITEM',
-                                    'payload': {'ID': zones[ind_z]['ID'],
-                                                'new_data': {'progress': 0.0}}})
-                    if zone['enabled']:
-                        self._act_zone = zone
-                        self._act_zone_index = ind_z
+        elif curr_state is WateringStates.CLOSE_BALL_VALVE:
+            # Единоразовые действия при входе в шаг
+            if curr_state is not prev_state:
+                ball_valve_on = False
+                state_entry_time = QTime.currentTime()
+                prev_state = curr_state
 
-                # Переходы
-                if not self._act_zone:
-                    self._dispatch({'type': 'log/INFO',
-                                    'payload': f'{timestamp} Ни одна зона не включена'})
-                    self._dispatch({'type': 'wateringcommon/UPDATE',
-                                    'payload': {'feedback': ExecDevFeedbacks.ABORTED,
-                                                'available': True}})
-                    self._curr_state = WateringStates.PENDING
-                    self._again = True
-                elif not pump['available']:
-                    self._dispatch({'type': 'log/ERROR',
-                                    'payload': f'{timestamp} Полив отменен, насос недоступен'})
-                    self._dispatch({'type': 'wateringcommon/UPDATE',
-                                    'payload': {'feedback': ExecDevFeedbacks.ERROR,
-                                                'available': False,
-                                                'status': OnOffDeviceStatuses.FAULTY}})
-                    self._curr_state = WateringStates.PENDING
-                    self._again = True
+            # Переходы
+            if state_entry_time.secsTo(QTime.currentTime()) > 2:
+                # специальная задержка, чтобы побыть какое-то время в этом состоянии
+                curr_state = WateringStates.STOP_PUMP
+                again = True
+            else:
+                curr_state = WateringStates.CHECK_IF_DEVICES_STOPPED
+                again = True
 
-                else:
-                    self._curr_state = WateringStates.START_PUMP
-                    self._again = True
+        elif curr_state is WateringStates.STOP_PUMP:
+            # Единоразовые действия при входе в шаг
+            if curr_state is not prev_state:
+                pump_outputs['run req from watering'] = False
+                state_entry_time = QTime.currentTime()
+                prev_state = curr_state
 
-            elif self._curr_state is WateringStates.START_PUMP:
-                # Единоразовые действия при входе в шаг
-                if self._curr_state is not self._prev_state:
-                    self._dispatch({'type': 'pump/UPDATE',
-                                    'payload': {'run request': True}})
-                    self._dispatch({'type': 'log/INFO',
-                                    'payload': f'{timestamp} Включение насоса'})
-                    self._dispatch({'type': 'wateringcommon/UPDATE',
-                                    'payload': {'status': WateringStatuses.STARTUP,
-                                                'feedback': ExecDevFeedbacks.BUSY,
-                                                }})
-                    self._state_entry_time = curr_time
-                    self._prev_state = self._curr_state
+            # Переходы
+            if state_entry_time.secsTo(QTime.currentTime()) > 2:
+                # специальная задержка, чтобы побыть какое-то время в этом состоянии
+                curr_state = WateringStates.PRESSURE_RELIEF
+                again = True
+            else:
+                curr_state = WateringStates.CHECK_IF_DEVICES_STOPPED
+                again = True
 
-                # всегда проверяем, есть ли хотя бы одна зона в статусе Pending
-                self._act_zone = None
-                for ind_z, zone in enumerate(zones):
-                    if zone['enabled']:
-                        self._act_zone = zone
-                        self._act_zone_index = ind_z
+        elif curr_state is WateringStates.PRESSURE_RELIEF:
+            # Единоразовые действия при входе в шаг
+            already_busy_zone_id = None  # Защита от дурака, вдруг уже есть включенная зона (ручной р, например)
+            if curr_state is not prev_state:
+                active_zone_id = None
+                for zone_id, zone in zones:
+                    if zone['available']:
+                        if zone['feedback'] is ExecDevFeedbacks.FINISHED and not active_zone_id:
+                            zones_outputs[zone_id]['exec request'] = True
+                            zones_outputs[zone_id]['duration'] = PRESSURE_RELIEF_DURATION
+                            active_zone_id = zone_id
+                        elif zone['feedback'] is ExecDevFeedbacks.BUSY:
+                            already_busy_zone_id = zone_id
+                prev_state = curr_state
 
-                # Переходы
-                if not self._act_zone:
-                    self._dispatch({'type': 'log/INFO',
-                                    'payload': f'{timestamp} Полив отменен, ни одна зона не включена'})
-                    self._dispatch({'type': 'wateringcommon/UPDATE',
-                                    'payload': {'feedback': ExecDevFeedbacks.ABORTED,
-                                                'available': True}})
-                    self._curr_state = WateringStates.PENDING
-                    self._again = True
-                elif pump['feedback'] is OnOffDevFeedbacks.NOT_RUN or not pump['available']:
-                    self._dispatch({'type': 'log/ERROR',
-                                    'payload': f'{timestamp} Полив отменен, насос недоступен'})
-                    self._dispatch({'type': 'wateringcommon/UPDATE',
-                                    'payload': {'feedback': ExecDevFeedbacks.ERROR,
-                                                'available': False,
-                                                'status': OnOffDeviceStatuses.FAULTY}})
-                    self._curr_state = WateringStates.PENDING
-                    self._again = True
+            # Постоянные действия
 
-                elif pump['feedback'] is OnOffDevFeedbacks.RUN and \
-                        self._state_entry_time.secsTo(curr_time) > 10:
-                    self._curr_state = WateringStates.OPEN_BALL_VALVE
-                    self._again = True
+            # Переходы
+            if not active_zone_id:
+                alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
+                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'text': f'Сброс давления отменен, нет ни одной доступной зоны'})
+                curr_state = WateringStates.SHUTDOWN
+                again = True
+            elif already_busy_zone_id:
+                alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
+                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'text': f'Сброс давления отменен, одна из зон уже включена'})
+                curr_state = WateringStates.SHUTDOWN
+                again = True
+            elif zones[active_zone_id]['feedback'] is ExecDevFeedbacks.DONE or \
+                    zones[active_zone_id]['feedback'] is ExecDevFeedbacks.ABORTED:
+                alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
+                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'text': f'Сброс давления выполнен'})
+                curr_state = WateringStates.SHUTDOWN
+                again = True
+            else:
+                curr_state = WateringStates.CHECK_IF_DEVICES_STOPPED
+                again = True
 
-            elif self._curr_state is WateringStates.OPEN_BALL_VALVE:
-                # Единоразовые действия при входе в шаг
-                if self._curr_state is not self._prev_state:
-                    self._dispatch({'type': 'wateringcommon/UPDATE',
-                                    'payload': {'ball valve on': True}})
-                    self._dispatch({'type': 'log/INFO',
-                                    'payload': f'{timestamp} Открытие шарового крана'})
-                    self._state_entry_time = curr_time
-                    self._prev_state = self._curr_state
+        elif curr_state is WateringStates.SHUTDOWN:
+            # Единоразовые действия при входе в шаг
+            if curr_state is not prev_state:
+                for zone_id, zone in zones:
+                    if zone['exec request']:
+                        zones_outputs[zone_id]['exec request'] = False
+                state_entry_time = QTime.currentTime()
+                prev_state = curr_state
 
-                # всегда проверяем, есть ли хотя бы одна зона в статусе Pending
-                self._act_zone = None
-                for ind_z, zone in enumerate(zones):
-                    if zone['enabled']:
-                        self._act_zone = zone
-                        self._act_zone_index = ind_z
+            # Переходы
+            if state_entry_time.secsTo(QTime.currentTime()) > 2:
+                # специальная задержка, чтобы побыть какое-то время в этом состоянии
+                curr_state = WateringStates.STANDBY
+                again = True
+            else:
+                curr_state = WateringStates.CHECK_IF_DEVICES_STOPPED
+                again = True
 
-                # Переходы
-                if not self._act_zone:
-                    self._dispatch({'type': 'log/INFO',
-                                    'payload': f'{timestamp} Полив отменен, ни одна зона не включена'})
-                    self._dispatch({'type': 'wateringcommon/UPDATE',
-                                    'payload': {'feedback': ExecDevFeedbacks.ABORTED,
-                                                'available': True}})
-                    self._curr_state = WateringStates.RUNNING_OUT
-                    self._again = True
-                elif pump['feedback'] is OnOffDevFeedbacks.NOT_RUN or not pump['available']:
-                    self._dispatch({'type': 'log/ERROR',
-                                    'payload': f'{timestamp} Полив отменен, насос недоступен'})
-                    self._dispatch({'type': 'wateringcommon/UPDATE',
-                                    'payload': {'feedback': ExecDevFeedbacks.ERROR,
-                                                'available': False,
-                                                'status': OnOffDeviceStatuses.FAULTY}})
-                    self._curr_state = WateringStates.RUNNING_OUT
-                    self._again = True
-                elif self._state_entry_time.secsTo(curr_time) > 10:
-                    # для шарового крана нет фидбека, просто ждем 10 сек
-                    self._dispatch({'type': 'wateringcommon/UPDATE',
-                                    'payload': {'status': WateringStatuses.RUN}})
-                    self._curr_state = WateringStates.WATERING_ZONE
-                    self._again = True
+        if not again:
+            break
 
-            elif self._curr_state is WateringStates.WATERING_ZONE:
-                # Единоразовые действия при входе в шаг
-                if self._curr_state is not self._prev_state:
-                    self._dispatch({'type': 'wateringzones/UPDATE_ITEM',
-                                    'payload': {'ID': self._act_zone['ID'],
-                                                'new_data': {'valve on': True,
-                                                             'status': WateringZoneStatuses.RUN}}})
-                    self._dispatch({'type': 'log/INFO',
-                                    'payload': f'{timestamp} Полив зоны {self._act_zone_index} начат'})
-                    self._time_of_finishing_zone = curr_time.addSecs(
-                        durations[self._act_cycle_index][self._act_zone_index]['duration'] * 60)
-                    self._state_entry_time = curr_time
-                    # Если уж мы попали в этот блок кода, то точно хотя бы одна акт зона у нас есть
-                    # self._prev_act_zone = self._act_zone
-                    # self._prev_act_zone_index = self._act_zone_index
-                    self._prev_state = self._curr_state
+    # статусы
+    if error:
+        status = OnOffDeviceStatuses.FAULTY
+    elif not available:
+        status = OnOffDeviceStatuses.OFF
+    elif prev_state is WateringStates.STANDBY:
+        status = OnOffDeviceStatuses.STANDBY
+    elif prev_state is WateringStates.START_PUMP or \
+            prev_state is WateringStates.OPEN_BALL_VALVE:
+        status = OnOffDeviceStatuses.STARTUP
+    elif prev_state is WateringStates.WATER_ZONE or \
+            prev_state is WateringStates.CHANGE_ZONE:
+        status = OnOffDeviceStatuses.RUN
+    elif prev_state is WateringStates.STOP_PUMP or \
+            prev_state is WateringStates.CLOSE_BALL_VALVE or \
+            prev_state is WateringStates.SHUTDOWN:
+        status = OnOffDeviceStatuses.SHUTDOWN
 
-                # Постоянные действия
-
-                duration_in_secs = durations[self._act_cycle_index][self._act_zone_index]['duration'] * 60
-                seconds_left = curr_time.secsTo(self._time_of_finishing_zone)
-                progress = (duration_in_secs - seconds_left) / duration_in_secs * 100.0
-                self._dispatch({'type': 'wateringzones/UPDATE_ITEM',
-                                'payload': {'ID': zones[self._act_zone_index]['ID'],
-                                            'new_data': {'progress': progress}}})
-
-                deviation = abs(self._act_zone['typ_flow'] - current['flowrate']) \
-                            / self._act_zone['typ_flow'] * 100.0
-                self._deviation_timer.run(deviation > self._act_zone['deviation'], SP_DEVIATION_DELAY)
-
-                # всегда проверяем, есть ли хотя бы одна зона в статусе Pending
-                self._act_zone = None
-                for ind_z, zone in enumerate(zones):
-                    if zone['enabled']:
-                        self._act_zone = zone
-                        self._act_zone_index = ind_z
-
-                self._next_act_zone = None
-                if self._act_zone:
-                    for ind_z, zone in enumerate(zones[self._act_zone_index:]):
-                        if zone['enabled']:
-                            self._next_act_zone = zone
-                            self._next_act_zone_index = ind_z
-
-                # Переходы
-                if not self._act_zone:
-                    self._dispatch({'type': 'log/INFO',
-                                    'payload': f'{timestamp} Полив отменен, ни одна зона не включена'})
-                    self._dispatch({'type': 'wateringcommon/UPDATE',
-                                    'payload': {'feedback': ExecDevFeedbacks.ABORTED,
-                                                'available': True}})
-                    self._curr_state = WateringStates.RUNNING_OUT
-                    self._again = True
-                elif pump['feedback'] is OnOffDevFeedbacks.NOT_RUN or not pump['available']:
-                    self._dispatch({'type': 'log/ERROR',
-                                    'payload': f'{timestamp} Полив отменен, насос недоступен'})
-                    self._dispatch({'type': 'wateringcommon/UPDATE',
-                                    'payload': {'feedback': ExecDevFeedbacks.ERROR,
-                                                'available': False,
-                                                'status': OnOffDeviceStatuses.FAULTY}})
-                    self._curr_state = WateringStates.RUNNING_OUT
-                    self._again = True
-                elif self._deviation_timer.out:
-                    self._dispatch({'type': 'log/WARNING',
-                                    'payload':
-                                        f'{timestamp} Полив зоны отменен, расход {current["flowrate"]:.1f} вне пределов'})
-                    if self._next_act_zone:
-                        self._dispatch({'type': 'wateringzones/UPDATE_ITEM',
-                                        'payload': {'ID': self._act_zone['ID'],
-                                                    'new_data': {'status': WateringZoneStatuses.FAULTY}}})
-                        self._curr_state = WateringStates.SWITCHING_ANOTHER_ZONE
-                        self._again = True
-                    else:
-                        self._curr_state = WateringStates.RUNNING_OUT
-                        self._again = True
-                elif seconds_left < 0:
-                    if self._next_act_zone:
-                        self._dispatch({'type': 'wateringzones/UPDATE_ITEM',
-                                        'payload': {'ID': self._act_zone['ID'],
-                                                    'new_data': {'status': WateringZoneStatuses.PENDING}}})
-                        self._curr_state = WateringStates.SWITCHING_ANOTHER_ZONE
-                        self._again = True
-                    else:
-                        self._dispatch({'type': 'log/INFO',
-                                        'payload': f'{timestamp} Полив зоны {self._act_zone_index} завершен'})
-                        self._curr_state = WateringStates.RUNNING_OUT
-                        self._again = True
-
-            elif self._curr_state is WateringStates.SWITCHING_ANOTHER_ZONE:
-                # Единоразовые действия при входе в шаг
-                if self._curr_state is not self._prev_state:
-                    self._dispatch({'type': 'wateringzones/UPDATE_ITEM',
-                                    'payload': {'ID': self._act_zone['ID'],
-                                                'new_data': {'valve on': False}}})
-                    self._dispatch({'type': 'log/INFO',
-                                    'payload': f'{timestamp} Полив зоны {self._act_zone_index} завершен'})
-                    self._act_zone = None
-                    self._state_entry_time = curr_time
-                    self._prev_state = self._curr_state
-
-                # Постоянные действия
-                self._next_act_zone = None
-                for ind_z, zone in enumerate(zones[self._act_zone_index:]):
-                    if zone['enabled']:
-                        self._next_act_zone = zone
-                        self._next_act_zone_index = ind_z
-
-                # Переходы
-                if not self._next_act_zone:
-                    self._dispatch({'type': 'log/INFO',
-                                    'payload': f'{timestamp} Полив отменен'})
-                    self._dispatch({'type': 'wateringcommon/UPDATE',
-                                    'payload': {'feedback': ExecDevFeedbacks.ABORTED,
-                                                'available': True}})
-                    self._curr_state = WateringStates.RUNNING_OUT
-                    self._again = True
-                elif pump['feedback'] is OnOffDevFeedbacks.NOT_RUN or not pump['available']:
-                    self._dispatch({'type': 'log/ERROR',
-                                    'payload': f'{timestamp} Полив отменен, насос недоступен'})
-                    self._dispatch({'type': 'wateringcommon/UPDATE',
-                                    'payload': {'feedback': ExecDevFeedbacks.ERROR,
-                                                'available': False,
-                                                'status': OnOffDeviceStatuses.FAULTY}})
-                    self._curr_state = WateringStates.RUNNING_OUT
-                    self._again = True
-                elif self._state_entry_time.secsTo(curr_time) > 5:
-                    self._act_zone = self._next_act_zone
-                    self._act_zone_index = self._next_act_zone_index
-                    self._curr_state = WateringStates.WATERING_ZONE
-                    self._again = True
-
-            elif self._curr_state is WateringStates.RUNNING_OUT:
-                # Единоразовые действия при входе в шаг
-                if self._curr_state is not self._prev_state:
-
-                    self._dispatch({'type': 'log/INFO',
-                                    'payload': f'{timestamp} Сброс давления'})
-                    self._dispatch({'type': 'wateringcommon/UPDATE',
-                                    'payload': {'ball valve on': False}})
-                    self._dispatch({'type': 'log/INFO',
-                                    'payload': f'{timestamp} Закрытие шарового крана'})
-                    self._dispatch({'type': 'pump/UPDATE',
-                                    'payload': {'run request': False}})
-                    self._dispatch({'type': 'log/INFO',
-                                    'payload': f'{timestamp} Выключение насоса'})
-                    self._dispatch({'type': 'wateringcommon/UPDATE',
-                                    'payload': {'status': WateringStatuses.SHUTDOWN}})
-                    # если попали сюда из SWITCHING_ANOTHER_ZONE, когда клапан пред зоны уже закрылся,
-                    # а следующему не дали открыться
-                    if not self._act_zone:
-                        # тогда просто назначим для сброса давления из доступных
-                        for ind_z, zone in enumerate(zones):
-                            if zone['enabled']:
-                                self._act_zone = zone
-                                self._act_zone_index = ind_z
-                                self._dispatch({'type': 'wateringzones/UPDATE_ITEM',
-                                                'payload': {'ID': self._act_zone['ID'],
-                                                            'new_data': {'valve on': True}}})
-                                break
-
-                    self._state_entry_time = curr_time
-                    self._prev_state = self._curr_state
-
-                # Переходы
-                if self._state_entry_time.secsTo(curr_time) > 30:
-                    self._curr_state = WateringStates.PENDING
-                    self._again = True
-
-            if not self._again:
-                break
+    # обновляем выходы
+    return {'ackn': ackn,
+            'error': error,
+            'available': available,
+            'feedback': feedback,
+            'ball valve on': ball_valve_on,
+            'active zone id': active_zone_id,
+            'curr state': curr_state,
+            'prev state': prev_state,
+            'state entry time': state_entry_time,
+            'raised errors': raised_errors,
+            'raised warnings': raised_warnings,
+            'status': status
+            }, zones_outputs, pump_outputs, alarm_log_batch

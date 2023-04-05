@@ -1,30 +1,13 @@
 from PyQt5.QtCore import QTime, QDateTime
 from string import Template
+from collections import OrderedDict
 
 from src.utils.WateringStatuses import *
 
 SP_DELAY = 5  # in seconds
 
 
-class States(Enum):
-    STANDBY = 0
-    CHECK_AVAILABILITY = 1
-    STARTUP = 2
-    EXECUTE = 3
-    SHUTDOWN = 4
-    CHECK_IF_DEVICES_RUNNING = 5
-    CHECK_IF_DEVICES_STOPPED = 6
-
-
-class ErrorMessages(Enum):
-    HIGH_FLOWRATE = Template('Зона $name: расход воды высокий ($flowrate), возможен порыв')
-
-
-class WarningMessages(Enum):
-    LOW_FLOWRATE = Template('Зона $name: малый расход воды ($flowrate)')
-
-
-def watering_zone_strategy(zone):
+def watering_zone_strategy(zone, watering):
     zone_id = zone['ID']
     name = zone['name']
     ackn = zone['ackn']
@@ -34,7 +17,7 @@ def watering_zone_strategy(zone):
     exec_request = zone['exec request']
     available = zone['available']
     valve_on = zone['valve on']
-    curr_flowrate = zone['curr flowrate']
+    curr_flowrate = watering['curr flowrate']
     hi_lim_flowrate = zone['hi lim flowrate']
     lo_lim_flowrate = zone['lo lim flowrate']
     duration_sec = zone['duration'] * 60  # from minutes to seconds
@@ -54,7 +37,7 @@ def watering_zone_strategy(zone):
         if error:
             error_test = False
             for key, val in raised_errors.items():
-                if key is ErrorMessages.HIGH_FLOWRATE:
+                if key is ZoneErrorMessages.HIGH_FLOWRATE:
                     if val:  # для более сложных ошибок тут будет еще и условие выхода
                         raised_errors[key] = False
                         alarm_log_batch.append({'type': LogAlarmMessageTypes.ERROR_OUT,
@@ -71,7 +54,63 @@ def watering_zone_strategy(zone):
     while True:
         again = False
 
-        if curr_state is States.STANDBY:
+        if curr_state is ZoneStates.CHECK_AVAILABILITY:
+            # Этот шаг исполняется один раз
+
+            if not enabled or error:
+                available = False
+            else:
+                available = True
+
+            # Переходы
+            curr_state = prev_state
+            again = True
+
+        elif curr_state is ZoneStates.CHECK_IF_DEVICES_STOPPED:
+            # Здесь этот шаг просто для проформы, чтобы все было единообразно
+            curr_state = ZoneStates.CHECK_IF_DEVICES_RUNNING
+            again = True
+
+        elif curr_state is ZoneStates.CHECK_IF_DEVICES_RUNNING:
+            # Постоянные действия
+            curr_time = QTime.currentTime()
+
+            # в случае первого обор можно и не проверять if cont_on, а вот дальше для др обор нужно
+            # No contactor feedback timer
+            if valve_on and curr_flowrate > hi_lim_flowrate:
+                if not flowrate_hi_timer:
+                    flowrate_hi_timer = curr_time
+            else:
+                flowrate_hi_timer = None
+
+            # Здесь могут быть и проверки работы др оборудования
+
+            # Переходы
+            error_test = False
+            for key, val in raised_errors.items():
+                if key is ZoneErrorMessages.HIGH_FLOWRATE:
+                    if flowrate_hi_timer:
+                        if flowrate_hi_timer.secsTo(curr_time) > SP_DELAY:
+                            raised_errors[key] = True
+                            alarm_log_batch.append({'type': LogAlarmMessageTypes.ERROR_IN,
+                                                    'alarm ID': key,
+                                                    'equip ID': zone_id,
+                                                    'dt_stamp': QDateTime.currentDateTime(),
+                                                    'text': 'IN:' + key.value.substitute(name=name,
+                                                                                         flowrate=curr_flowrate)})
+                            flowrate_hi_timer = None
+                            error_test = True
+            if error_test:
+                error = True
+                available = False
+                feedback = ExecDevFeedbacks.ABORTED
+                curr_state = prev_state  # ZoneStates.SHUTDOWN
+                again = True
+            else:
+                curr_state = ZoneStates.CHECK_AVAILABILITY
+                again = False
+
+        elif curr_state is ZoneStates.STANDBY:
             # Единоразовые действия при входе в шаг
             if curr_state is not prev_state:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
@@ -84,25 +123,13 @@ def watering_zone_strategy(zone):
 
             # Переходы
             if available and exec_request:
-                curr_state = States.EXECUTE
+                curr_state = ZoneStates.EXECUTE
                 again = True
             else:
-                curr_state = States.CHECK_IF_DEVICES_STOPPED
+                curr_state = ZoneStates.CHECK_IF_DEVICES_STOPPED
                 again = True
 
-        elif curr_state is States.CHECK_AVAILABILITY:
-            # Этот шаг исполняется один раз
-
-            if not enabled or error:
-                available = False
-            else:
-                available = True
-
-            # Переходы
-            curr_state = prev_state
-            again = True
-
-        elif curr_state is States.EXECUTE:
+        elif curr_state is ZoneStates.EXECUTE:
             # Единоразовые действия при входе в шаг
             if curr_state is not prev_state:
                 curr_time = QTime.currentTime()
@@ -130,7 +157,7 @@ def watering_zone_strategy(zone):
             # В данном случае в цикле только одна проверка, но для сложного объекта их может быть много
 
             for key, val in raised_warnings.items():
-                if key is WarningMessages.LOW_FLOWRATE:
+                if key is ZoneWarningMessages.LOW_FLOWRATE:
                     if flowrate_lo_timer:
                         if flowrate_lo_timer.secsTo(curr_time) > SP_DELAY:
                             if not val:
@@ -152,25 +179,25 @@ def watering_zone_strategy(zone):
                                                                                           flowrate=curr_flowrate)})
 
             # Переходы
-            if not available:
+            if not available or not exec_request:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
                                         'dt_stamp': QDateTime.currentDateTime(),
                                         'text': f'Полив зоны {name} отменен'})
                 feedback = ExecDevFeedbacks.ABORTED
-                curr_state = States.SHUTDOWN
+                curr_state = ZoneStates.SHUTDOWN
                 again = True
             elif seconds_passed > duration_sec:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
                                         'dt_stamp': QDateTime.currentDateTime(),
                                         'text': f'Полив зоны {name} выполнен'})
                 feedback = ExecDevFeedbacks.DONE
-                curr_state = States.SHUTDOWN
+                curr_state = ZoneStates.SHUTDOWN
                 again = True
             else:
-                curr_state = States.CHECK_IF_DEVICES_STOPPED
+                curr_state = ZoneStates.CHECK_IF_DEVICES_STOPPED
                 again = True
 
-        elif curr_state is States.SHUTDOWN:
+        elif curr_state is ZoneStates.SHUTDOWN:
             # Единоразовые действия при входе в шаг
             if curr_state is not prev_state:
                 valve_on = False
@@ -178,57 +205,12 @@ def watering_zone_strategy(zone):
                 prev_state = curr_state
 
             # Переходы
-            if not exec_request and \
-                    state_entry_time.secsTo(QTime.currentTime()) > 2:
-                # специальная задержка, чтобы побыть какое-то время в этом состоянии
-                curr_state = States.STANDBY
+            if not exec_request:
+                curr_state = ZoneStates.STANDBY
                 again = True
             else:
-                curr_state = States.CHECK_IF_DEVICES_STOPPED
+                curr_state = ZoneStates.CHECK_IF_DEVICES_STOPPED
                 again = True
-
-        elif curr_state is States.CHECK_IF_DEVICES_STOPPED:
-            curr_state = States.CHECK_IF_DEVICES_RUNNING
-            again = True
-
-        elif curr_state is States.CHECK_IF_DEVICES_RUNNING:
-            # Постоянные действия
-            curr_time = QTime.currentTime()
-
-            # в случае первого обор можно и не проверять if cont_on, а вот дальше для др обор нужно
-            # No contactor feedback timer
-            if valve_on and curr_flowrate > hi_lim_flowrate:
-                if not flowrate_hi_timer:
-                    flowrate_hi_timer = curr_time
-            else:
-                flowrate_hi_timer = None
-
-            # Здесь могут быть и проверки работы др оборудования
-
-            # Переходы
-            error_test = False
-            for key, val in raised_errors.items():
-                if key is ErrorMessages.HIGH_FLOWRATE:
-                    if flowrate_hi_timer:
-                        if flowrate_hi_timer.secsTo(curr_time) > SP_DELAY:
-                            raised_errors[key] = True
-                            alarm_log_batch.append({'type': LogAlarmMessageTypes.ERROR_IN,
-                                                    'alarm ID': key,
-                                                    'equip ID': zone_id,
-                                                    'dt_stamp': QDateTime.currentDateTime(),
-                                                    'text': 'IN:' + key.value.substitute(name=name,
-                                                                                         flowrate=curr_flowrate)})
-                            flowrate_hi_timer = None
-                            error_test = True
-            if error_test:
-                error = True
-                available = False
-                feedback = ExecDevFeedbacks.ABORTED
-                curr_state = States.SHUTDOWN
-                again = True
-            else:
-                curr_state = States.CHECK_AVAILABILITY
-                again = False
 
         if not again:
             break
@@ -238,16 +220,15 @@ def watering_zone_strategy(zone):
         status = OnOffDeviceStatuses.FAULTY
     elif not available:
         status = OnOffDeviceStatuses.OFF
-    elif prev_state is States.STANDBY:
+    elif prev_state is ZoneStates.STANDBY:
         status = OnOffDeviceStatuses.STANDBY
-    elif prev_state is States.EXECUTE:
+    elif prev_state is ZoneStates.EXECUTE:
         status = OnOffDeviceStatuses.RUN
-    elif prev_state is States.SHUTDOWN:
+    elif prev_state is ZoneStates.SHUTDOWN:
         status = OnOffDeviceStatuses.SHUTDOWN
 
     # обновляем выходы
     return {'ackn': ackn,
-            'exec request': exec_request,
             'error': error,
             'available': available,
             'feedback': feedback,
@@ -262,6 +243,7 @@ def watering_zone_strategy(zone):
             'raised warnings': raised_warnings,
             'status': status
             }, alarm_log_batch
+
 
 if __name__ == '__main__':
     from PyQt5.QtCore import QTimer
@@ -371,9 +353,10 @@ if __name__ == '__main__':
             self._lbl_curr_flowrate = QLabel('Current flowrate simulate')
             self._spb_curr_flowrate = QDoubleSpinBox()
             self._spb_curr_flowrate.setRange(0.0, 2.0)
+            self._spb_curr_flowrate.setSingleStep(0.1)
             self._spb_curr_flowrate.setValue(state['curr flowrate'])
             self._spb_curr_flowrate.valueChanged.connect(
-                lambda: self._dispatch({'type': 'zone/UPDATE',
+                lambda: self._dispatch({'type': 'watering/UPDATE',
                                         'payload':
                                             {'curr flowrate': self._spb_curr_flowrate.value()}
                                         }))
@@ -412,41 +395,89 @@ if __name__ == '__main__':
             pass
 
 
-    init_state = {'ID': '9966',
-                  'name': 'Zone 1',
-                  'ackn': False,
-                  'error': False,
-                  'feedback': ExecDevFeedbacks.FINISHED,
-                  'enabled': True,
-                  'exec request': False,
-                  'available': True,
-                  'valve on': False,
-                  'curr flowrate': 0.0,
-                  'hi lim flowrate': 1.6,
-                  'lo lim flowrate': 0.4,
-                  'duration': 10,
-                  'progress': 0.0,
-                  'flowrate hi timer': None,
-                  'flowrate lo timer': None,
-                  'curr state': States.CHECK_AVAILABILITY,
-                  'prev state': States.STANDBY,
-                  'state entry time': None,
-                  'raised errors': {ErrorMessages.HIGH_FLOWRATE: False},
-                  'raised warnings': {WarningMessages.LOW_FLOWRATE: False},
-                  'status': OnOffDeviceStatuses.STANDBY
-                  }
+    zones_init_state = OrderedDict({'9966rtdf':
+                                        {'ID': '9966rtdf',
+                                         'name': 'Zone 1',
+                                         'ackn': False,
+                                         'error': False,
+                                         'feedback': ExecDevFeedbacks.FINISHED,
+                                         'enabled': True,
+                                         'exec request': False,
+                                         'available': True,
+                                         'valve on': False,
+                                         'hi lim flowrate': 1.6,
+                                         'lo lim flowrate': 0.4,
+                                         'duration': 1,
+                                         'progress': 0.0,
+                                         'flowrate hi timer': None,
+                                         'flowrate lo timer': None,
+                                         'curr state': ZoneStates.CHECK_AVAILABILITY,
+                                         'prev state': ZoneStates.STANDBY,
+                                         'state entry time': None,
+                                         'raised errors': {ZoneErrorMessages.HIGH_FLOWRATE: False},
+                                         'raised warnings': {ZoneWarningMessages.LOW_FLOWRATE: False},
+                                         'status': OnOffDeviceStatuses.STANDBY
+                                         },
+                                    'asdfghjk':
+                                        {'ID': 'asdfghjk',
+                                         'name': 'Zone 2',
+                                         'ackn': False,
+                                         'error': False,
+                                         'feedback': ExecDevFeedbacks.FINISHED,
+                                         'enabled': True,
+                                         'exec request': False,
+                                         'available': True,
+                                         'valve on': False,
+                                         'hi lim flowrate': 1.6,
+                                         'lo lim flowrate': 0.4,
+                                         'duration': 1,
+                                         'progress': 0.0,
+                                         'flowrate hi timer': None,
+                                         'flowrate lo timer': None,
+                                         'curr state': ZoneStates.CHECK_AVAILABILITY,
+                                         'prev state': ZoneStates.STANDBY,
+                                         'state entry time': None,
+                                         'raised errors': {ZoneErrorMessages.HIGH_FLOWRATE: False},
+                                         'raised warnings': {ZoneWarningMessages.LOW_FLOWRATE: False},
+                                         'status': OnOffDeviceStatuses.STANDBY
+                                         }})
+
+    watering_init_state = {'curr flowrate': 0.0}
+
+    init_state = {'zones': zones_init_state,
+                  'watering': watering_init_state}
 
 
-    def reducer(state=None, action=None):
+    def zones_reducer(state=None, action=None):
         if state is None:
             state = {}
-        elif action['type'] == 'zone/UPDATE':
+        elif action['type'] == 'zones/UPDATE':
+            ID = action['payload']['ID']
+            new_state = state.copy()
+            item_state = new_state[ID].copy()
+            new_state[ID] = {**item_state, **(action['payload']['new_data'])}
+            return new_state
+        elif action['type'] == 'log/ACKNOWLEDGEMENT':
+            new_state = state.copy()
+            for key, item in state:
+                new_item = item.copy()
+                new_state[key] = {**new_item, **({'ackn': True})}
+            return new_state
+        else:
+            return state
+
+
+    def watering_reducer(state=None, action=None):
+        if state is None:
+            state = {}
+        elif action['type'] == 'watering/UPDATE':
             new_state = {**state, **(action['payload'])}
             return new_state
         else:
             return state
 
-    store = pydux.create_store(reducer, init_state)
+    root_reducer = pydux.combine_reducers({'zones': zones_reducer, 'watering': watering_reducer})
+    store = pydux.create_store(root_reducer, init_state)
 
     app = QApplication([])
 

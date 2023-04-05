@@ -1,156 +1,123 @@
-from PyQt5.QtCore import QTimer, QTime, QDate
+from PyQt5.QtCore import QTime, QDateTime
 # from enum import IntEnum
 from src.store.store import ConnectedToStoreComponent
 from src.utils.WateringStatuses import *
 
 
-class WateringCyclesStates(Enum):
-    PENDING = 0
-    CHECKING = 1
-    EXECUTION = 10
-    ABORTING = 200
-    RESETTING = 201
+def watering_cycle_strategy(cycle, cycles, watering):
+    cycle_id = cycle['ID']
+    ackn = cycle['ackn']
+    curr_state = cycle['curr state']
+    prev_state = cycle['prev state']
+    prev_time = cycle['prev time']
+    enabled = cycle['enabled']
+    available = cycle['available']
+    active = cycle['active']
+    hour = cycle['hour']
+    minute = cycle['minute']
 
+    watering_outputs = {'act cycle': watering['act cycle']}
 
-class WateringCyclesStrategy(ConnectedToStoreComponent):
-    def __init__(self):
-        ConnectedToStoreComponent.__init__(self)
+    alarm_log_batch = []
 
-        self._act_cycle = None
-        self._curr_state = WateringCyclesStates.PENDING
-        self._prev_state = WateringCyclesStates.PENDING
-        self._prev_exec_time = QTime.currentTime()  # Нужно для точного единоразового назначения акт цикла
+    curr_time = QTime.currentTime()
 
-    def _on_timer_tick(self):
-        cycles = self._get_store_state()['watering']['cycles']
-        current = self._get_store_state()['watering']['current']
-        # Текущее время - нужно во многих местах
-        curr_time = QTime.currentTime()
-        # Строка с временем и датой - нужна для сообщений в лог
-        timestamp = f'{QDate.currentDate().toString("dd.MM.yy")} {curr_time.toString("hh:mm")}'
+    # Автомат
+    while True:
+        again = False
 
-        # Автомат
-        while True:
-            self._again = False
+        if curr_state is CycleStates.CHECK_AVAILABILITY:
+            # Этот шаг исполняется один раз
+            any_other_active_cycle = False
+            for c_id, c in cycles:
+                if c is not cycle:
+                    if c['active']:
+                        no_other_active_cycle = True
 
-            if self._curr_state is WateringCyclesStates.PENDING:
-                # Единоразовые действия при входе в шаг
-                if self._curr_state is not self._prev_state:
-                    self._prev_state = self._curr_state
+            if not enabled or \
+                    not watering['available'] or \
+                    any_other_active_cycle or \
+                    watering['feedback'] is not ExecDevFeedbacks.FINISHED:
+                available = False
+            else:
+                available = True
 
-                # Постоянные действия
-                # отслеживаем, не пришло ли время след полива
-                for ind_c, cycle in enumerate(cycles):
-                    activation_time = QTime(cycle['hour'], cycle['minute'])
-                    if cycle['enabled'] \
-                            and (activation_time.msecsTo(curr_time) <= 0 and
-                                 activation_time.msecsTo(self._prev_exec_time)) >= 0:
-                        self._act_cycle = cycle
-                        break
+            # Переходы
+            curr_state = prev_state
+            again = True
 
-                self._prev_exec_time = curr_time
+        elif curr_state is ZoneStates.CHECK_IF_DEVICES_STOPPED:
+            # Здесь этот шаг просто для проформы, чтобы все было единообразно
+            curr_state = ZoneStates.CHECK_IF_DEVICES_RUNNING
+            again = True
 
-                # Переходы
-                if self._act_cycle:
-                    self._curr_state = WateringCyclesStates.CHECKING
-                    self._again = True
+        elif curr_state is ZoneStates.CHECK_IF_DEVICES_RUNNING:
+            # Здесь этот шаг просто для проформы, чтобы все было единообразно
+            curr_state = ZoneStates.CHECK_AVAILABILITY
+            again = False
 
-            if self._curr_state is WateringCyclesStates.CHECKING:
-                # Единоразовые действия при входе в шаг
-                if self._curr_state is not self._prev_state:
-                    self._prev_state = self._curr_state
+        elif curr_state is CycleStates.STANDBY:
+            # Единоразовые действия при входе в шаг
+            if curr_state is not prev_state:
+                prev_state = curr_state
 
-                # Переходы
-                if not current['available']:
-                    self._dispatch({'type': 'log/ERROR',
-                                    'payload': f'{timestamp} Полив отменен, система полива недоступна'})
-                    self._curr_state = WateringCyclesStates.PENDING
-                    self._again = True
+            activation_time = QTime(hour, minute)
 
-                elif current['feedback'] is ExecDevFeedbacks.BUSY:
-                    self._dispatch({'type': 'log/INFO',
-                                    'payload': f'{timestamp} Полив отменен, система уже работает'})
-                    self._curr_state = WateringCyclesStates.PENDING
-                    self._again = True
-
-                elif not self._act_cycle['enabled']:
-                    self._dispatch({'type': 'log/INFO',
-                                    'payload': f'{timestamp} Полив отменен, т.к. цикл отключен'})
-                    self._curr_state = WateringCyclesStates.PENDING
-                    self._again = True
-
+            # Переходы
+            if (activation_time.msecsTo(curr_time) <= 0 and
+                     activation_time.msecsTo(prev_time)) >= 0:
+                if available:
+                    curr_state = CycleStates.EXECUTE
+                    again = True
                 else:
-                    self._curr_state = WateringCyclesStates.EXECUTION
-                    self._again = True
+                    alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
+                                            'dt_stamp': QDateTime.currentDateTime(),
+                                            'text': f'Полив {hour}:{minute} отменен'})
 
-            if self._curr_state is WateringCyclesStates.EXECUTION:
-                # Единоразовые действия при входе в шаг
-                if self._curr_state is not self._prev_state:
-                    self._dispatch({'type': 'log/INFO',
-                                    'payload': f'{timestamp} Полив начат'})
-                    self._dispatch({'type': 'wateringcycles/UPDATE_ITEM',
-                                    'payload': {'ID': self._act_cycle['ID'],
-                                                'new_data': {'status': WateringCycleStatuses.RUN}}})
-                    self._dispatch({'type': 'wateringcommon/UPDATE',
-                                    'payload': {'exec request': True}})
-                    self._prev_state = self._curr_state
+            else:
+                curr_state = ZoneStates.CHECK_IF_DEVICES_STOPPED
+                again = True
 
-                # Переходы
-                if not self._act_cycle['enabled']:
-                    self._dispatch({'type': 'log/INFO',
-                                    'payload': f'{timestamp} Полив отменен, т.к. цикл отключен'})
-                    self._curr_state = WateringCyclesStates.ABORTING
-                    self._again = True
-                elif not current['available']:
-                    if current['feedback'] is ExecDevFeedbacks.ERROR:
-                        self._dispatch({'type': 'log/INFO',
-                                        'payload': f'{timestamp} Полив отменен, система полива недоступна'})
-                    else:
-                        self._dispatch({'type': 'log/INFO',
-                                        'payload': f'{timestamp} Полив отменен, система полива неисправна'})
-                    self._curr_state = WateringCyclesStates.RESETTING
-                    self._again = True
-                elif current['feedback'] is ExecDevFeedbacks.ABORTED:
-                    self._dispatch({'type': 'log/INFO',
-                                    'payload': f'{timestamp} Полив отменен, отмена работы блока полива'})
-                    self._curr_state = WateringCyclesStates.RESETTING
-                    self._again = True
-                elif current['feedback'] is ExecDevFeedbacks.DONE:
-                    self._dispatch({'type': 'log/INFO',
-                                    'payload': f'{timestamp} Полив завершен планово'})
-                    self._curr_state = WateringCyclesStates.RESETTING
-                    self._again = True
+        if curr_state is CycleStates.EXECUTE:
+            # Единоразовые действия при входе в шаг
+            if curr_state is not prev_state:
+                alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
+                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'text': f'Полив {hour}:{minute} начат'})
+                watering_outputs['act cycle'] = cycle
+                active = True
+                prev_state = curr_state
 
-            if self._curr_state is WateringCyclesStates.ABORTING:
-                # Единоразовые действия при входе в шаг
-                if self._curr_state is not self._prev_state:
-                    self._dispatch({'type': 'wateringcycles/UPDATE_ITEM',
-                                    'payload': {'ID': self._act_cycle['ID'],
-                                                'new_data': {'status': WateringCycleStatuses.PENDING}}})
-                    self._dispatch({'type': 'wateringcommon/UPDATE',
-                                    'payload': {'abort': True}})
-                    self._prev_state = self._curr_state
+            # Переходы
+            if watering['feedback'] is ExecDevFeedbacks.DONE:
+                alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
+                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'text': f'Полив {hour}:{minute} выполнен'})
+                curr_state = CycleStates.SHUTDOWN
+                again = True
+            elif not available or \
+                    watering['feedback'] is ExecDevFeedbacks.ABORTED:
+                alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
+                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'text': f'Полив {hour}:{minute} отменен'})
+                curr_state = CycleStates.SHUTDOWN
+                again = True
+            else:
+                curr_state = CycleStates.CHECK_IF_DEVICES_STOPPED
+                again = True
 
-                # Переходы
-                if current['feedback'] in [ExecDevFeedbacks.ABORTED, ExecDevFeedbacks.ERROR, ExecDevFeedbacks.DONE]\
-                        or not current['available']:
-                    # раз есть проверка current['available'], то можно было бы ExecDevFeedbacks.ERROR
-                    # и не проверять
-                    self._curr_state = WateringCyclesStates.PENDING
-                    self._again = True
+        elif curr_state is CycleStates.SHUTDOWN:
+            # Единоразовые действия при входе в шаг
+            if curr_state is not prev_state:
+                watering_outputs['act cycle'] = None
+                active = False
+                prev_state = curr_state
 
-            if self._curr_state is WateringCyclesStates.RESETTING:
-                # Единоразовые действия при входе в шаг
-                if self._curr_state is not self._prev_state:
-                    self._dispatch({'type': 'wateringcycles/UPDATE_ITEM',
-                                    'payload': {'ID': self._act_cycle['ID'],
-                                                'new_data': {'status': WateringCycleStatuses.PENDING}}})
-                    self._act_cycle = None
-                    self._prev_state = self._curr_state
+            # Переходы
+            curr_state = ZoneStates.STANDBY
+            again = True
 
-                # Переходы
-                self._curr_state = WateringCyclesStates.PENDING
-                self._again = True
+        if not again:
+            break
 
-            if not self._again:
-                break
+        prev_time = curr_time

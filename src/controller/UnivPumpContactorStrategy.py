@@ -4,11 +4,11 @@ from src.utils.WateringStatuses import *
 
 def univ_pump_cont_strategy(pump_cont, cont_strategy):
     run_req_from_watering = pump_cont['run req from watering']
-    run_req_from_button = pump_cont['run req from button']
+    run_req_from_button = pump_cont['run request']
     run_request = run_req_from_watering or run_req_from_button
 
     enabled_for_watering = pump_cont['enabled for watering']
-    enabled_for_button = pump_cont['enabled for button']
+    enabled_for_button = pump_cont['enabled']
     enabled = enabled_for_watering or enabled_for_button
 
     contactor = pump_cont.copy()
@@ -42,21 +42,21 @@ def univ_pump_cont_strategy(pump_cont, cont_strategy):
             feedback_for_button = OnOffDevFeedbacks.NOT_RUN
         elif cont_updated_outputs['feedback'] is OnOffDevFeedbacks.NOT_STOP:
             feedback_for_button = OnOffDevFeedbacks.RUN
-    cont_updated_outputs['feedback for button'] = feedback_for_button
+    cont_updated_outputs['feedback'] = feedback_for_button
 
     # обновляем выходы
     return cont_updated_outputs, alarm_log_batch
 
 
 if __name__ == '__main__':
-    from PyQt5.QtCore import QSize, Qt, QTimer
+    from PyQt5.QtCore import QTimer
     from PyQt5.QtWidgets import \
         QApplication, QMainWindow, QPushButton, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QTextBrowser
     import pydux
     from src.store.ConnectedComponent import ConnectedComponent
     from src.utils.Buttons import *
 
-    keys_to_print = ['error', 'feedback for watering', 'feedback for button', 'available',
+    keys_to_print = ['error', 'feedback for watering', 'feedback', 'available',
                      'cont on', 'curr state', 'prev state', 'cont no fdbk timer', 'cont fdbk not off timer',
                      'status']
 
@@ -115,9 +115,9 @@ if __name__ == '__main__':
             self._btn_enable_for_b.clicked.connect(
                 lambda: self._dispatch({'type': 'pump/UPDATE',
                                         'payload':
-                                            {'enabled for button': not self._get_own_state()['enabled for button']}
+                                            {'enabled': not self._get_own_state()['enabled']}
                                         }))
-            self._updated_widgets_map['enabled for button'] = \
+            self._updated_widgets_map['enabled'] = \
                 lambda x: change_toggle_button_style(x,
                                                      self._btn_enable_for_b,
                                                      'StandardButton',
@@ -135,13 +135,13 @@ if __name__ == '__main__':
                                                      'StandardButton',
                                                      'StandardButton EnabledButton')
 
-            self._btn_run_for_b = QPushButton('Run for b')
+            self._btn_run_for_b = QPushButton('Run')
             self._btn_run_for_b.clicked.connect(
                 lambda: self._dispatch({'type': 'pump/UPDATE',
                                         'payload':
-                                            {'run req from button': not self._get_own_state()['run req from button']}
+                                            {'run request': not self._get_own_state()['run request']}
                                         }))
-            self._updated_widgets_map['run req from button'] = \
+            self._updated_widgets_map['run request'] = \
                 lambda x: change_toggle_button_style(x,
                                                      self._btn_run_for_b,
                                                      'StandardButton',
@@ -227,12 +227,12 @@ if __name__ == '__main__':
                   'ackn': False,
                   'error': False,
                   'feedback for watering': OnOffDevFeedbacks.STOP,
-                  'feedback for button': OnOffDevFeedbacks.STOP,
+                  'feedback': OnOffDevFeedbacks.STOP,
                   'contactor feedback': False,
                   'enabled for watering': True,
-                  'enabled for button': True,
+                  'enabled': True,
                   'run req from watering': False,
-                  'run req from button': False,
+                  'run request': False,
                   'available': True,
                   'cont on': False,
                   'cont no fdbk timer': None,
