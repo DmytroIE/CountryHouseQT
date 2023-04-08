@@ -46,4 +46,5 @@ class AlarmLog(ConnectedToStoreComponent, QWidget):
         pass
 
     def _updater(self):
+        print('updater alarm log')
         pass

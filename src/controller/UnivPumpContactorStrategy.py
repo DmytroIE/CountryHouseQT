@@ -1,8 +1,7 @@
-from src.controller.ContactorStrategy import *
+from src.controller.ContactorStrategy import contactor_strategy
 from src.utils.WateringStatuses import *
 
-
-def univ_pump_cont_strategy(pump_cont, cont_strategy):
+def univ_pump_cont_strategy(pump_cont):
     run_req_from_watering = pump_cont['run req from watering']
     run_req_from_button = pump_cont['run request']
     run_request = run_req_from_watering or run_req_from_button
@@ -14,34 +13,34 @@ def univ_pump_cont_strategy(pump_cont, cont_strategy):
     contactor = pump_cont.copy()
     contactor['run request'] = run_request
     contactor['enabled'] = enabled
-    contactor['feedback'] = OnOffDevFeedbacks.PENDING
+    contactor['feedback'] = EnableDevFeedbacks.PENDING
 
-    cont_updated_outputs, alarm_log_batch = cont_strategy(contactor)
+    cont_updated_outputs, alarm_log_batch = contactor_strategy(contactor)
 
     feedback_for_watering = cont_updated_outputs['feedback']
     if not run_req_from_watering:
-        if cont_updated_outputs['feedback'] is OnOffDevFeedbacks.RUN:
-            feedback_for_watering = OnOffDevFeedbacks.NOT_STOP
-        elif cont_updated_outputs['feedback'] is OnOffDevFeedbacks.NOT_RUN:
-            feedback_for_watering = OnOffDevFeedbacks.STOP
+        if cont_updated_outputs['feedback'] is EnableDevFeedbacks.RUN:
+            feedback_for_watering = EnableDevFeedbacks.NOT_STOP
+        elif cont_updated_outputs['feedback'] is EnableDevFeedbacks.NOT_RUN:
+            feedback_for_watering = EnableDevFeedbacks.STOP
     else:
-        if cont_updated_outputs['feedback'] is OnOffDevFeedbacks.STOP:
-            feedback_for_watering = OnOffDevFeedbacks.NOT_RUN
-        elif cont_updated_outputs['feedback'] is OnOffDevFeedbacks.NOT_STOP:
-            feedback_for_watering = OnOffDevFeedbacks.RUN
+        if cont_updated_outputs['feedback'] is EnableDevFeedbacks.STOP:
+            feedback_for_watering = EnableDevFeedbacks.NOT_RUN
+        elif cont_updated_outputs['feedback'] is EnableDevFeedbacks.NOT_STOP:
+            feedback_for_watering = EnableDevFeedbacks.RUN
     cont_updated_outputs['feedback for watering'] = feedback_for_watering
 
     feedback_for_button = cont_updated_outputs['feedback']
     if not run_req_from_button:
-        if cont_updated_outputs['feedback'] is OnOffDevFeedbacks.RUN:
-            feedback_for_button = OnOffDevFeedbacks.NOT_STOP
-        elif cont_updated_outputs['feedback'] is OnOffDevFeedbacks.NOT_RUN:
-            feedback_for_button = OnOffDevFeedbacks.STOP
+        if cont_updated_outputs['feedback'] is EnableDevFeedbacks.RUN:
+            feedback_for_button = EnableDevFeedbacks.NOT_STOP
+        elif cont_updated_outputs['feedback'] is EnableDevFeedbacks.NOT_RUN:
+            feedback_for_button = EnableDevFeedbacks.STOP
     else:
-        if cont_updated_outputs['feedback'] is OnOffDevFeedbacks.STOP:
-            feedback_for_button = OnOffDevFeedbacks.NOT_RUN
-        elif cont_updated_outputs['feedback'] is OnOffDevFeedbacks.NOT_STOP:
-            feedback_for_button = OnOffDevFeedbacks.RUN
+        if cont_updated_outputs['feedback'] is EnableDevFeedbacks.STOP:
+            feedback_for_button = EnableDevFeedbacks.NOT_RUN
+        elif cont_updated_outputs['feedback'] is EnableDevFeedbacks.NOT_STOP:
+            feedback_for_button = EnableDevFeedbacks.RUN
     cont_updated_outputs['feedback'] = feedback_for_button
 
     # обновляем выходы
@@ -212,7 +211,7 @@ if __name__ == '__main__':
         def _on_timer_tick(self):
             state = self._get_store_state()
             try:
-                new_state_chunk, alarm_log_batch = univ_pump_cont_strategy(state, contactor_strategy)
+                new_state_chunk, alarm_log_batch = univ_pump_cont_strategy(state)
                 self._dispatch({'type': 'pump/UPDATE', 'payload': new_state_chunk})
                 for item in alarm_log_batch:
                     print(f'{item["dt_stamp"].toString("dd.MM.yy mm:ss")} {item["text"]}')
@@ -226,8 +225,8 @@ if __name__ == '__main__':
                   'name': 'UnivPump',
                   'ackn': False,
                   'error': False,
-                  'feedback for watering': OnOffDevFeedbacks.STOP,
-                  'feedback': OnOffDevFeedbacks.STOP,
+                  'feedback for watering': EnableDevFeedbacks.STOP,
+                  'feedback': EnableDevFeedbacks.STOP,
                   'contactor feedback': False,
                   'enabled for watering': True,
                   'enabled': True,
@@ -237,11 +236,11 @@ if __name__ == '__main__':
                   'cont on': False,
                   'cont no fdbk timer': None,
                   'cont fdbk not off timer': None,
-                  'curr state': States.CHECK_AVAILABILITY,
-                  'prev state': States.STANDBY,
+                  'curr state': ContactorStates.CHECK_AVAILABILITY,
+                  'prev state': ContactorStates.STANDBY,
                   'state entry time': None,
-                  'raised errors': {ErrorMessages.NO_FEEDBACK_WHEN_RUN: False},
-                  'raised warnings': {WarningMessages.CANT_STOP_CONTACTOR: False},
+                  'raised errors': {ContactorErrorMessages.NO_FEEDBACK_WHEN_RUN: False},
+                  'raised warnings': {ContactorWarningMessages.CANT_STOP_CONTACTOR: False},
                   'status': OnOffDeviceStatuses.STANDBY
                   }
 

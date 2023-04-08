@@ -3,7 +3,7 @@ from src.utils.WateringStatuses import *
 pump_default = {
     'run request': False,
     'run request for watering': False,
-    'feedback': OnOffDevFeedbacks.STOP,
+    'feedback': EnableDevFeedbacks.STOP,
     'available': True,
     'available for watering': True,
     'status': OnOffDeviceStatuses.PENDING,

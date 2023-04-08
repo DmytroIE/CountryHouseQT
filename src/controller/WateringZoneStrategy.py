@@ -7,17 +7,18 @@ from src.utils.WateringStatuses import *
 SP_DELAY = 5  # in seconds
 
 
-def watering_zone_strategy(zone, watering):
+def watering_zone_strategy(zone, process):
     zone_id = zone['ID']
     name = zone['name']
     ackn = zone['ackn']
     error = zone['error']
     feedback = zone['feedback']
+    feedback_temp = zone['feedback temp']
     enabled = zone['enabled']
     exec_request = zone['exec request']
     available = zone['available']
     valve_on = zone['valve on']
-    curr_flowrate = watering['curr flowrate']
+    curr_flowrate = process['curr flowrate']
     hi_lim_flowrate = zone['hi lim flowrate']
     lo_lim_flowrate = zone['lo lim flowrate']
     duration_sec = zone['duration'] * 60  # from minutes to seconds
@@ -102,9 +103,7 @@ def watering_zone_strategy(zone, watering):
                             error_test = True
             if error_test:
                 error = True
-                available = False
-                feedback = ExecDevFeedbacks.ABORTED
-                curr_state = prev_state  # ZoneStates.SHUTDOWN
+                curr_state = prev_state
                 again = True
             else:
                 curr_state = ZoneStates.CHECK_AVAILABILITY
@@ -122,7 +121,7 @@ def watering_zone_strategy(zone, watering):
             feedback = ExecDevFeedbacks.FINISHED
 
             # Переходы
-            if available and exec_request:
+            if available and not error and exec_request:
                 curr_state = ZoneStates.EXECUTE
                 again = True
             else:
@@ -137,11 +136,11 @@ def watering_zone_strategy(zone, watering):
                                         'dt_stamp': QDateTime.currentDateTime(),
                                         'text': f'Полив зоны {name} начат'})
                 valve_on = True
+                feedback = ExecDevFeedbacks.BUSY
                 state_entry_time = curr_time
                 prev_state = curr_state
 
             # Постоянные действия
-            feedback = ExecDevFeedbacks.BUSY
             curr_time = QTime.currentTime()
             seconds_passed = state_entry_time.secsTo(curr_time)
             progress = seconds_passed / duration_sec * 100.0
@@ -183,14 +182,18 @@ def watering_zone_strategy(zone, watering):
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
                                         'dt_stamp': QDateTime.currentDateTime(),
                                         'text': f'Полив зоны {name} отменен'})
-                feedback = ExecDevFeedbacks.ABORTED
+                feedback_temp = ExecDevFeedbacks.ABORTED
+                curr_state = ZoneStates.SHUTDOWN
+                again = True
+            elif error:
+                feedback_temp = ExecDevFeedbacks.ABORTED
                 curr_state = ZoneStates.SHUTDOWN
                 again = True
             elif seconds_passed > duration_sec:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
                                         'dt_stamp': QDateTime.currentDateTime(),
                                         'text': f'Полив зоны {name} выполнен'})
-                feedback = ExecDevFeedbacks.DONE
+                feedback_temp = ExecDevFeedbacks.DONE
                 curr_state = ZoneStates.SHUTDOWN
                 again = True
             else:
@@ -200,8 +203,32 @@ def watering_zone_strategy(zone, watering):
         elif curr_state is ZoneStates.SHUTDOWN:
             # Единоразовые действия при входе в шаг
             if curr_state is not prev_state:
+                for key, val in raised_warnings.items():
+                    if key is ZoneWarningMessages.LOW_FLOWRATE:
+                        if val:
+                            raised_warnings[key] = False
+                            alarm_log_batch.append({'type': LogAlarmMessageTypes.WARNING_OUT,
+                                                    'alarm ID': key,
+                                                    'equip ID': zone_id,
+                                                    'dt_stamp': QDateTime.currentDateTime(),
+                                                    'text': 'OUT:' + key.value.substitute(name=name,
+                                                                                          flowrate=curr_flowrate)})
                 valve_on = False
                 state_entry_time = QTime.currentTime()
+                prev_state = curr_state
+
+            # Переходы
+            if state_entry_time.secsTo(QTime.currentTime()) > 2:
+                curr_state = ZoneStates.RESETTING
+                again = True
+            else:
+                curr_state = ZoneStates.CHECK_IF_DEVICES_STOPPED
+                again = True
+
+        elif curr_state is ZoneStates.RESETTING:
+            # Единоразовые действия при входе в шаг
+            if curr_state is not prev_state:
+                feedback = feedback_temp
                 prev_state = curr_state
 
             # Переходы
@@ -232,6 +259,7 @@ def watering_zone_strategy(zone, watering):
             'error': error,
             'available': available,
             'feedback': feedback,
+            'feedback temp': feedback_temp,
             'valve on': valve_on,
             'progress': progress,
             'flowrate hi timer': flowrate_hi_timer,
@@ -258,17 +286,16 @@ if __name__ == '__main__':
                      'valve on', 'progress', 'curr state', 'prev state',
                      'status']
 
-
-    class MainWindow(ConnectedComponent, QMainWindow):
+    class Zone(ConnectedComponent, QWidget):
         def __init__(self, store1):
-            QMainWindow.__init__(self)
+            QWidget.__init__(self)
             ConnectedComponent.__init__(self, store1)
 
             self._create_ui()
             self._updater()
 
         def _get_own_state(self):  # selector
-            return self._get_store_state()
+            return self._get_store_state()['watering zone']
 
         def _on_state_update(self, new_state, updated_keys_list, action):
             if action == 'ADD' or action == 'UPDATE':
@@ -280,6 +307,92 @@ if __name__ == '__main__':
                 self._txt_view.setText('\n'.join(new_text))
 
         def _create_ui(self):
+            self._lyt_main = QVBoxLayout(self)
+
+            self._updated_widgets_map = {}
+
+            self._btn_enable = QPushButton('Enable')
+            self._btn_enable.clicked.connect(
+                lambda: self._dispatch({'type': 'wateringzone/UPDATE',
+                                        'payload':
+                                            {'enabled': not self._get_own_state()['enabled']}
+                                        }))
+            self._updated_widgets_map['enabled'] = \
+                lambda x: change_toggle_button_style(x,
+                                                     self._btn_enable,
+                                                     'StandardButton',
+                                                     'StandardButton EnabledButton')
+
+            self._btn_exec = QPushButton('Execute')
+            self._btn_exec.clicked.connect(
+                lambda: self._dispatch({'type': 'wateringzone/UPDATE',
+                                        'payload':
+                                            {'exec request': not self._get_own_state()['exec request']}
+                                        }))
+            self._updated_widgets_map['exec request'] = \
+                lambda x: change_toggle_button_style(x,
+                                                     self._btn_exec,
+                                                     'StandardButton',
+                                                     'StandardButton EnabledButton')
+
+            self._btn_ackn = QPushButton('Ackn')
+            self._btn_ackn.clicked.connect(
+                lambda: self._dispatch({'type': 'wateringzone/UPDATE',
+                                        'payload':
+                                            {'ackn': not self._get_own_state()['ackn']}
+                                        }))
+            self._updated_widgets_map['ackn'] = \
+                lambda x: change_toggle_button_style(x,
+                                                     self._btn_ackn,
+                                                     'StandardButton',
+                                                     'StandardButton EnabledButton')
+
+            self._lyt_first = QHBoxLayout()
+            self._lyt_first.addWidget(self._btn_enable)
+            self._lyt_first.addWidget(self._btn_exec)
+            self._lyt_first.addWidget(self._btn_ackn)
+
+            self._txt_view = QTextBrowser()
+
+            self._lyt_main.addLayout(self._lyt_first)
+            self._lyt_main.addWidget(self._txt_view)
+
+    class Process(ConnectedComponent, QWidget):
+        def __init__(self, store1):
+            QWidget.__init__(self)
+            ConnectedComponent.__init__(self, store1)
+
+            self._create_ui()
+            self._updater()
+
+        def _get_own_state(self):  # selector
+            return self._get_store_state()['watering process']
+
+        def _on_state_update(self, new_state, updated_keys_list, action):
+            pass
+
+        def _create_ui(self):
+            self._lbl_curr_flowrate = QLabel('Current flowrate simulate')
+            self._spb_curr_flowrate = QDoubleSpinBox()
+            self._spb_curr_flowrate.setRange(0.0, 2.0)
+            self._spb_curr_flowrate.setValue(self._get_own_state()['curr flowrate'])
+            self._spb_curr_flowrate.valueChanged.connect(
+                lambda: self._dispatch({'type': 'wateringprocess/UPDATE',
+                                        'payload':
+                                            {'curr flowrate': self._spb_curr_flowrate.value()}
+                                        }))
+
+            self._lyt_second = QHBoxLayout(self)
+            self._lyt_second.addWidget(self._lbl_curr_flowrate)
+            self._lyt_second.addWidget(self._spb_curr_flowrate)
+
+
+    class MainWindow(QMainWindow):
+        def __init__(self, store1):
+            QMainWindow.__init__(self)
+            self._create_ui(store1)
+
+        def _create_ui(self, store1):
             self.setStyleSheet('.StandardButton {\
                                                      background-color: rgb(250,250,250);\
                                                      border-style: solid;\
@@ -299,7 +412,6 @@ if __name__ == '__main__':
                                        .EnabledButton:hover{\
                                                       border-color: rgb(130,205,191);\
                                                       background-color: rgb(163, 195, 201);}')
-            state = self._get_own_state()
 
             self.setWindowTitle("Test Zone Strategy")
             self.setGeometry(0, 0, 640, 480)
@@ -307,70 +419,11 @@ if __name__ == '__main__':
             self._wdg_central = QWidget()
             self._lyt_main = QVBoxLayout(self._wdg_central)
 
-            self._updated_widgets_map = {}
+            self._process = Process(store1)
+            self._zone = Zone(store1)
 
-            self._btn_enable = QPushButton('Enable')
-            self._btn_enable.clicked.connect(
-                lambda: self._dispatch({'type': 'zone/UPDATE',
-                                        'payload':
-                                            {'enabled': not self._get_own_state()['enabled']}
-                                        }))
-            self._updated_widgets_map['enabled'] = \
-                lambda x: change_toggle_button_style(x,
-                                                     self._btn_enable,
-                                                     'StandardButton',
-                                                     'StandardButton EnabledButton')
-
-            self._btn_exec = QPushButton('Execute')
-            self._btn_exec.clicked.connect(
-                lambda: self._dispatch({'type': 'zone/UPDATE',
-                                        'payload':
-                                            {'exec request': not self._get_own_state()['exec request']}
-                                        }))
-            self._updated_widgets_map['exec request'] = \
-                lambda x: change_toggle_button_style(x,
-                                                     self._btn_exec,
-                                                     'StandardButton',
-                                                     'StandardButton EnabledButton')
-
-            self._btn_ackn = QPushButton('Ackn')
-            self._btn_ackn.clicked.connect(
-                lambda: self._dispatch({'type': 'zone/UPDATE',
-                                        'payload':
-                                            {'ackn': not self._get_own_state()['ackn']}
-                                        }))
-            self._updated_widgets_map['ackn'] = \
-                lambda x: change_toggle_button_style(x,
-                                                     self._btn_ackn,
-                                                     'StandardButton',
-                                                     'StandardButton EnabledButton')
-
-            self._lyt_first = QHBoxLayout()
-            self._lyt_first.addWidget(self._btn_enable)
-            self._lyt_first.addWidget(self._btn_exec)
-            self._lyt_first.addWidget(self._btn_ackn)
-
-            self._lbl_curr_flowrate = QLabel('Current flowrate simulate')
-            self._spb_curr_flowrate = QDoubleSpinBox()
-            self._spb_curr_flowrate.setRange(0.0, 2.0)
-            self._spb_curr_flowrate.setSingleStep(0.1)
-            self._spb_curr_flowrate.setValue(state['curr flowrate'])
-            self._spb_curr_flowrate.valueChanged.connect(
-                lambda: self._dispatch({'type': 'watering/UPDATE',
-                                        'payload':
-                                            {'curr flowrate': self._spb_curr_flowrate.value()}
-                                        }))
-
-            self._lyt_second = QHBoxLayout()
-            self._lyt_second.addWidget(self._lbl_curr_flowrate)
-            self._lyt_second.addWidget(self._spb_curr_flowrate)
-
-            self._txt_view = QTextBrowser()
-
-            self._lyt_main.addLayout(self._lyt_first)
-            self._lyt_main.addLayout(self._lyt_second)
-            self._lyt_main.addWidget(self._txt_view)
-
+            self._lyt_main.addWidget(self._process)
+            self._lyt_main.addWidget(self._zone)
             self.setCentralWidget(self._wdg_central)
 
 
@@ -382,10 +435,11 @@ if __name__ == '__main__':
             self._one_second_timer.start(1000)
 
         def _on_timer_tick(self):
-            state = self._get_store_state()
+            zone = self._get_store_state()['watering zone']
+            process = self._get_store_state()['watering process']
             try:
-                new_state_chunk, alarm_log_batch = watering_zone_strategy(state)
-                self._dispatch({'type': 'zone/UPDATE', 'payload': new_state_chunk})
+                new_state_chunk, alarm_log_batch = watering_zone_strategy(zone, process)
+                self._dispatch({'type': 'wateringzone/UPDATE', 'payload': new_state_chunk})
                 for item in alarm_log_batch:
                     print(f'{item["dt_stamp"].toString("dd.MM.yy mm:ss")} {item["text"]}')
             except Exception as e:
@@ -395,88 +449,59 @@ if __name__ == '__main__':
             pass
 
 
-    zones_init_state = OrderedDict({'9966rtdf':
-                                        {'ID': '9966rtdf',
-                                         'name': 'Zone 1',
-                                         'ackn': False,
-                                         'error': False,
-                                         'feedback': ExecDevFeedbacks.FINISHED,
-                                         'enabled': True,
-                                         'exec request': False,
-                                         'available': True,
-                                         'valve on': False,
-                                         'hi lim flowrate': 1.6,
-                                         'lo lim flowrate': 0.4,
-                                         'duration': 1,
-                                         'progress': 0.0,
-                                         'flowrate hi timer': None,
-                                         'flowrate lo timer': None,
-                                         'curr state': ZoneStates.CHECK_AVAILABILITY,
-                                         'prev state': ZoneStates.STANDBY,
-                                         'state entry time': None,
-                                         'raised errors': {ZoneErrorMessages.HIGH_FLOWRATE: False},
-                                         'raised warnings': {ZoneWarningMessages.LOW_FLOWRATE: False},
-                                         'status': OnOffDeviceStatuses.STANDBY
-                                         },
-                                    'asdfghjk':
-                                        {'ID': 'asdfghjk',
-                                         'name': 'Zone 2',
-                                         'ackn': False,
-                                         'error': False,
-                                         'feedback': ExecDevFeedbacks.FINISHED,
-                                         'enabled': True,
-                                         'exec request': False,
-                                         'available': True,
-                                         'valve on': False,
-                                         'hi lim flowrate': 1.6,
-                                         'lo lim flowrate': 0.4,
-                                         'duration': 1,
-                                         'progress': 0.0,
-                                         'flowrate hi timer': None,
-                                         'flowrate lo timer': None,
-                                         'curr state': ZoneStates.CHECK_AVAILABILITY,
-                                         'prev state': ZoneStates.STANDBY,
-                                         'state entry time': None,
-                                         'raised errors': {ZoneErrorMessages.HIGH_FLOWRATE: False},
-                                         'raised warnings': {ZoneWarningMessages.LOW_FLOWRATE: False},
-                                         'status': OnOffDeviceStatuses.STANDBY
-                                         }})
+    watering_zone_init_state = {'ID': '9966rtdf',
+                                'name': 'Zone 1',
+                                'ackn': False,
+                                'error': False,
+                                'feedback': ExecDevFeedbacks.FINISHED,
+                                'feedback temp': ExecDevFeedbacks.FINISHED,
+                                'enabled': True,
+                                'exec request': False,
+                                'available': True,
+                                'valve on': False,
+                                'hi lim flowrate': 1.6,
+                                'lo lim flowrate': 0.4,
+                                'duration': 1,
+                                'progress': 0.0,
+                                'flowrate hi timer': None,
+                                'flowrate lo timer': None,
+                                'curr state': ZoneStates.CHECK_AVAILABILITY,
+                                'prev state': ZoneStates.STANDBY,
+                                'state entry time': None,
+                                'raised errors': {ZoneErrorMessages.HIGH_FLOWRATE: False},
+                                'raised warnings': {ZoneWarningMessages.LOW_FLOWRATE: False},
+                                'status': OnOffDeviceStatuses.STANDBY
+                                }
+    watering_process_init_state = {'ID': 'gg58d9d8',
+                                   'curr flowrate': 0.2}
 
-    watering_init_state = {'curr flowrate': 0.0}
-
-    init_state = {'zones': zones_init_state,
-                  'watering': watering_init_state}
+    init_state = {'watering zone': watering_zone_init_state,
+                  'watering process': watering_process_init_state}
 
 
-    def zones_reducer(state=None, action=None):
+    def watering_zone_reducer(state=None, action=None):
         if state is None:
             state = {}
-        elif action['type'] == 'zones/UPDATE':
-            ID = action['payload']['ID']
-            new_state = state.copy()
-            item_state = new_state[ID].copy()
-            new_state[ID] = {**item_state, **(action['payload']['new_data'])}
-            return new_state
-        elif action['type'] == 'log/ACKNOWLEDGEMENT':
-            new_state = state.copy()
-            for key, item in state:
-                new_item = item.copy()
-                new_state[key] = {**new_item, **({'ackn': True})}
-            return new_state
-        else:
-            return state
-
-
-    def watering_reducer(state=None, action=None):
-        if state is None:
-            state = {}
-        elif action['type'] == 'watering/UPDATE':
+        if action['type'] == 'wateringzone/UPDATE':
             new_state = {**state, **(action['payload'])}
             return new_state
         else:
             return state
 
-    root_reducer = pydux.combine_reducers({'zones': zones_reducer, 'watering': watering_reducer})
+
+    def watering_process_reducer(state=None, action=None):
+        if state is None:
+            state = {}
+        if action['type'] == 'wateringprocess/UPDATE':
+            new_state = {**state, **(action['payload'])}
+            return new_state
+        else:
+            return state
+
+
+    root_reducer = pydux.combine_reducers({'watering zone': watering_zone_reducer,
+                                           'watering process': watering_process_reducer})
+
     store = pydux.create_store(root_reducer, init_state)
 
     app = QApplication([])

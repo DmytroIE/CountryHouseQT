@@ -10,6 +10,8 @@ RUN_OUT = 4
 
 statuses = {OFF: "Выключен", STANDBY: "В ожидании", IN_WORK: "В работе", FAULTY: "Неисправность", RUN_OUT: "Выбег"}
 
+SP_STATE_TRANSITION_TYPICAL_DELAY = 2  # in seconds
+
 
 class OnOffDeviceStatuses(Enum):
     OFF = 'Выключен'
@@ -20,7 +22,7 @@ class OnOffDeviceStatuses(Enum):
     FAULTY = 'Неисправность'
 
 
-class OnOffDevFeedbacks(Enum):
+class EnableDevFeedbacks(Enum):
     PENDING = 0
     RUN = 1
     NOT_RUN = 2
@@ -33,16 +35,6 @@ class ExecDevFeedbacks(Enum):
     BUSY = 1
     DONE = 2
     ABORTED = 3
-
-
-
-# class WateringStatuses(Enum):
-#     # OFF = 'Выключен'
-#     STANDBY = 'В ожидании'
-#     STARTUP = 'Запуск'
-#     RUN = 'Работа'
-#     SHUTDOWN = 'Выключение'
-#     FAULTY = 'Неисправность'
 
 
 class LogAlarmMessageTypes(Enum):
@@ -61,8 +53,9 @@ class ZoneStates(Enum):
     CHECK_AVAILABILITY = 1
     EXECUTE = 2
     SHUTDOWN = 3
-    CHECK_IF_DEVICES_RUNNING = 4
-    CHECK_IF_DEVICES_STOPPED = 5
+    RESETTING = 4
+    CHECK_IF_DEVICES_RUNNING = 5
+    CHECK_IF_DEVICES_STOPPED = 6
 
 
 class ZoneErrorMessages(Enum):
@@ -73,11 +66,11 @@ class ZoneWarningMessages(Enum):
     LOW_FLOWRATE = Template('Зона $name: малый расход воды ($flowrate)')
 
 
-class WateringErrorMessages(Enum):
+class WateringProcessErrorMessages(Enum):
     PUMP_NOT_RUNNING = Template('Полив отменен, насос не работает')
 
 
-class WateringStates(Enum):
+class WateringProcessStates(Enum):
     STANDBY = 0
     CHECK_AVAILABILITY = 1
     START_PUMP = 2
@@ -85,17 +78,38 @@ class WateringStates(Enum):
     WATER_ZONE = 4
     CHANGE_ZONE = 5
     CLOSE_BALL_VALVE = 6
-    STOP_PUMP = 7
-    PRESSURE_RELIEF = 8
-    SHUTDOWN = 9
-    CHECK_IF_DEVICES_RUNNING = 10
-    CHECK_IF_DEVICES_STOPPED = 11
+    CLOSE_ZONE_VALVES = 7
+    STOP_PUMP = 8
+    PRESSURE_RELIEF = 9
+    CLOSE_ZONE_VALVE_AFTER_PRESSURE_RELIEF = 10
+    RESETTING = 11
+    CHECK_IF_DEVICES_RUNNING = 12
+    CHECK_IF_DEVICES_STOPPED = 13
 
 
 class CycleStates(Enum):
+    CHECK_CONDITIONS_TO_EXECUTE = 0
+    STANDBY = 1
+    EXECUTE = 2
+    SHUTDOWN = 3
+
+
+class ContactorStates(Enum):
     STANDBY = 0
-    CHECK_IF_DEVICES_STOPPED = 1
-    CHECK_IF_DEVICES_RUNNING = 2
-    CHECK_AVAILABILITY = 3
-    EXECUTE = 4
-    SHUTDOWN = 5
+    CHECK_AVAILABILITY = 1
+    STARTUP = 2
+    RUN = 3
+    SHUTDOWN = 4
+    CHECK_IF_DEVICES_RUNNING = 5
+    CHECK_IF_DEVICES_STOPPED = 6
+
+
+class ContactorErrorMessages(Enum):
+    NO_FEEDBACK_WHEN_RUN = Template('Авария контактора $name')
+
+
+class ContactorWarningMessages(Enum):
+    CANT_STOP_CONTACTOR = Template('Невозможно отключить контактор $name')
+
+
+SP_CONTACTOR_TIMER_DELAY = 5  # in seconds

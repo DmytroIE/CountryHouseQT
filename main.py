@@ -22,7 +22,7 @@ class MainWindow(QMainWindow):
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     app.setStyleSheet("QVBoxLayout { padding-top: 1px;  padding-bottom: 1px}")  # ???????????????
-    controller = Controller()
+    # controller = Controller()
     window = MainWindow()
     window.show()
     sys.exit(app.exec())

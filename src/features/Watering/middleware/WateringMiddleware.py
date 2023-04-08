@@ -1,6 +1,45 @@
 from PyQt5.QtWidgets import QMessageBox
 
 
+def check_flowrate_limits_mw(store_):
+    dispatch, get_state = store_['dispatch'], store_['get_state']
+
+    def disp(next_):
+        def act(action):
+            if action['type'] == 'wateringzones/UPDATE_ITEM':
+                wrong_data = False
+                zone_id = action['payload']['ID']
+                if 'hi lim flowrate' in action['payload']['new_data']:
+                    if action['payload']['new_data']['hi lim flowrate'] < \
+                            get_state()['watering']['zones'][zone_id]['lo lim flowrate']+0.01:
+                        action['payload']['new_data']['hi lim flowrate'] = \
+                            get_state()['watering']['zones'][zone_id]['hi lim flowrate']
+                        action['payload']['new_data']['forced update'] = \
+                            not get_state()['watering']['zones'][zone_id]['forced update']
+                        wrong_data = True
+                elif 'lo lim flowrate' in action['payload']['new_data']:
+                    if action['payload']['new_data']['lo lim flowrate'] > \
+                            get_state()['watering']['zones'][zone_id]['hi lim flowrate']-0.01:
+                        action['payload']['new_data']['lo lim flowrate'] = \
+                            get_state()['watering']['zones'][zone_id]['lo lim flowrate']
+                        action['payload']['new_data']['forced update'] = \
+                            not get_state()['watering']['zones'][zone_id]['forced update']
+                        wrong_data = True
+                if wrong_data:
+                    dlg = QMessageBox()
+                    dlg.setWindowTitle('Ошибка')
+                    dlg.setText('Лимиты настроены неверно!')
+                    dlg.setStandardButtons(QMessageBox.Ok)
+                    dlg.setIcon(QMessageBox.Critical)
+                    dlg.exec()
+
+            next_(action)
+
+        return act
+
+    return disp
+
+
 def watering_action_dialogs_mw(store_):
     dispatch, get_state = store_['dispatch'], store_['get_state']
 
