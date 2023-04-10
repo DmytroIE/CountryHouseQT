@@ -59,15 +59,15 @@ class ZoneStates(Enum):
 
 
 class ZoneErrorMessages(Enum):
-    HIGH_FLOWRATE = Template('Зона $name: расход воды высокий ($flowrate), возможен порыв')
+    HIGH_FLOWRATE = Template('Zone: Зона $name: расход воды высокий ($flowrate), возможен порыв')
 
 
 class ZoneWarningMessages(Enum):
-    LOW_FLOWRATE = Template('Зона $name: малый расход воды ($flowrate)')
+    LOW_FLOWRATE = Template('Zone: Зона $name: малый расход воды ($flowrate)')
 
 
 class WateringProcessErrorMessages(Enum):
-    PUMP_NOT_RUNNING = Template('Полив отменен, насос не работает')
+    PUMP_NOT_RUNNING = 'Process: Полив отменен, насос не работает'
 
 
 class WateringProcessStates(Enum):
@@ -78,10 +78,10 @@ class WateringProcessStates(Enum):
     WATER_ZONE = 4
     CHANGE_ZONE = 5
     CLOSE_BALL_VALVE = 6
-    CLOSE_ZONE_VALVES = 7
+    RESET_ZONES_AFTER_WATERING = 7
     STOP_PUMP = 8
     PRESSURE_RELIEF = 9
-    CLOSE_ZONE_VALVE_AFTER_PRESSURE_RELIEF = 10
+    RESET_ZONES_AFTER_PRESSURE_RELIEF = 10
     RESETTING = 11
     CHECK_IF_DEVICES_RUNNING = 12
     CHECK_IF_DEVICES_STOPPED = 13
@@ -105,11 +105,11 @@ class ContactorStates(Enum):
 
 
 class ContactorErrorMessages(Enum):
-    NO_FEEDBACK_WHEN_RUN = Template('Авария контактора $name')
+    NO_FEEDBACK_WHEN_RUN = Template('Cont: Авария контактора $name')
 
 
 class ContactorWarningMessages(Enum):
-    CANT_STOP_CONTACTOR = Template('Невозможно отключить контактор $name')
+    CANT_STOP_CONTACTOR = Template('Cont: Невозможно отключить контактор $name')
 
 
 SP_CONTACTOR_TIMER_DELAY = 5  # in seconds

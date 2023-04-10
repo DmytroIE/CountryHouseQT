@@ -11,7 +11,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self, **kwargs):
         QtWidgets.QMainWindow.__init__(self)
-        self.setWindowTitle('My Countryhouse')
+        self.setWindowTitle('Моя дача')
         self.setGeometry(0, 0, 800, 480)
 
         self._wdg_main = MainWidget()

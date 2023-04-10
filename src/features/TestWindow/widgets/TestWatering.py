@@ -3,21 +3,24 @@ from PyQt5.QtWidgets import \
 from src.store.store import ConnectedToStoreComponent
 from src.utils.Buttons import *
 
-pump_keys_to_print = ['available', 'error', 'cont on', 'feedback', 'feedback for watering',
+pump_keys_to_print = ['run req from watering', 'available', 'error', 'cont on', 'feedback', 'feedback for watering',
                       'curr state', 'prev state', 'cont no fdbk timer', 'cont fdbk not off timer',
                       'status']
-process_keys_to_print = ['available', 'error', 'feedback', 'act cycle', 'active zone id',
+process_keys_to_print = ['available', 'error', 'feedback', 'act cycle ID', 'active zone id',
                          'ball valve on', 'curr state', 'prev state',
                          'status']
-
+act_cycle_keys_to_print = ['active', 'hour', 'minute', 'curr state', 'prev state', 'status']
+act_zone_keys_to_print = ['exec request', 'available', 'error', 'feedback', 'curr state', 'prev state', 'status']
 
 class TestWatering(ConnectedToStoreComponent, QWidget):
     def __init__(self):
         QWidget.__init__(self)
         ConnectedToStoreComponent.__init__(self)
 
-        self._cached_pump = None # self._get_pump_state()
-        self._cached_process = None # self._get_process_state()
+        self._cached_pump = None
+        self._cached_process = None
+        self._cached_act_zone = None
+        self._cached_act_cycle = None
         self._create_ui()
 
     def _updater(self):
@@ -48,6 +51,26 @@ class TestWatering(ConnectedToStoreComponent, QWidget):
             new_text = [f'{k}: {new_process[k]}' for k in process_keys_to_print]
             self._txt_process_view.setText('\n'.join(new_text))
             self._cached_process = new_process
+
+        if new_process['act cycle ID']:
+            new_act_cycle = self._get_store_state()['watering']['cycles'][new_process['act cycle ID']]
+            if new_act_cycle is not self._cached_act_cycle:
+                new_text = [f'{k}: {new_act_cycle[k]}' for k in act_cycle_keys_to_print]
+                self._txt_act_cycle_view.setText('\n'.join(new_text))
+                self._cached_act_cycle = new_act_cycle
+        else:
+            self._txt_act_cycle_view.setText('No active cycle')
+            self._cached_act_cycle = None
+
+        if new_process['active zone id']:
+            new_act_zone = self._get_store_state()['watering']['zones'][new_process['active zone id']]
+            if new_act_zone is not self._cached_act_zone:
+                new_text = [f'{k}: {new_act_zone[k]}' for k in act_zone_keys_to_print]
+                self._txt_act_zone_view.setText('\n'.join(new_text))
+                self._cached_act_zone = new_act_zone
+        else:
+            self._txt_act_zone_view.setText('No active cycle')
+            self._cached_act_zone = None
 
     def _get_pump_state(self):
         return self._get_store_state()['contactors']['vv3GJie1']
@@ -116,6 +139,8 @@ class TestWatering(ConnectedToStoreComponent, QWidget):
         self._lyt_third.addWidget(self._spb_curr_flowrate)
 
         self._txt_process_view = QTextBrowser()
+        self._txt_act_zone_view = QTextBrowser()
+        self._txt_act_cycle_view = QTextBrowser()
         # new_text = [f'{k}: {process[k]}' for k in process_keys_to_print]
         # self._txt_process_view.setText('\n'.join(new_text))
 
@@ -131,7 +156,10 @@ class TestWatering(ConnectedToStoreComponent, QWidget):
         self._lyt_main.addLayout(self._lyt_first)
         self._lyt_main.addLayout(self._lyt_second)
         self._lyt_main.addWidget(self._txt_pump_view)
+        self._lyt_main.addWidget(QLabel('Активный цикл'))
+        self._lyt_main.addWidget(self._txt_act_cycle_view)
         self._lyt_main.addWidget(QLabel('Процесс'))
         self._lyt_main.addLayout(self._lyt_third)
         self._lyt_main.addWidget(self._txt_process_view)
-
+        self._lyt_main.addWidget(QLabel('Активная зона'))
+        self._lyt_main.addWidget(self._txt_act_zone_view)

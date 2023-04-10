@@ -12,8 +12,8 @@ def watering_zones_reducer(state=None, action=None):
                 changed = True
                 break
         if changed or \
-                'hi lim flowrate' in action['payload']['new_data'].values() or \
-                'lo lim flowrate' in action['payload']['new_data'].values():
+                'hi lim flowrate' in action['payload']['new_data'].keys() or \
+                'lo lim flowrate' in action['payload']['new_data'].keys():
             new_state = state.copy()
             new_state[zone_id] = {**new_state[zone_id], **(action['payload']['new_data'])}
             return new_state
