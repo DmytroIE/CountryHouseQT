@@ -14,16 +14,16 @@ def check_flowrate_limits_mw(store_):
                             get_state()['watering']['zones'][zone_id]['lo lim flowrate']+0.01:
                         action['payload']['new_data']['hi lim flowrate'] = \
                             get_state()['watering']['zones'][zone_id]['hi lim flowrate']
-                        action['payload']['new_data']['forced update'] = \
-                            not get_state()['watering']['zones'][zone_id]['forced update']
+                        # action['payload']['new_data']['forced update'] = \
+                        #     not get_state()['watering']['zones'][zone_id]['forced update']
                         wrong_data = True
                 elif 'lo lim flowrate' in action['payload']['new_data']:
                     if action['payload']['new_data']['lo lim flowrate'] > \
                             get_state()['watering']['zones'][zone_id]['hi lim flowrate']-0.01:
                         action['payload']['new_data']['lo lim flowrate'] = \
                             get_state()['watering']['zones'][zone_id]['lo lim flowrate']
-                        action['payload']['new_data']['forced update'] = \
-                            not get_state()['watering']['zones'][zone_id]['forced update']
+                        # action['payload']['new_data']['forced update'] = \
+                        #     not get_state()['watering']['zones'][zone_id]['forced update']
                         wrong_data = True
                 if wrong_data:
                     dlg = QMessageBox()

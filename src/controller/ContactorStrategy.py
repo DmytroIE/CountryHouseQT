@@ -292,20 +292,21 @@ def contactor_strategy(contactor):
         status = OnOffDeviceStatuses.SHUTDOWN
 
     # обновляем выходы
-    return {'ackn': ackn,
-            'error': error,
-            'feedback': feedback,
-            'available': available,
-            'cont on': cont_on,
-            'cont no fdbk timer': cont_no_fdbk_timer,
-            'cont fdbk not off timer': cont_fdbk_not_off_timer,
-            'curr state': curr_state,
-            'prev state': prev_state,
-            'state entry time': state_entry_time,
-            'raised errors': raised_errors,
-            'raised warnings': raised_warnings,
-            'status': status
-            }, alarm_log_batch
+    cont_outputs = {'ackn': ackn,
+                    'error': error,
+                    'feedback': feedback,
+                    'available': available,
+                    'cont on': cont_on,
+                    'cont no fdbk timer': cont_no_fdbk_timer,
+                    'cont fdbk not off timer': cont_fdbk_not_off_timer,
+                    'curr state': curr_state,
+                    'prev state': prev_state,
+                    'state entry time': state_entry_time,
+                    'raised errors': raised_errors,
+                    'raised warnings': raised_warnings,
+                    'status': status
+                    }
+    return cont_outputs, alarm_log_batch
 
 
 if __name__ == '__main__':
@@ -486,6 +487,7 @@ if __name__ == '__main__':
             return new_state
         else:
             return state
+
 
     store = pydux.create_store(reducer, init_state)
 

@@ -1,0 +1,8 @@
+change in combine_reducers string 77-78 with this
+
+            if isinstance(next_state_for_key, (int, float, str, bool)):
+                has_changed = (has_changed or
+                           next_state_for_key != previous_state_for_key)
+            else:
+                has_changed = (has_changed or
+                               next_state_for_key is not previous_state_for_key)

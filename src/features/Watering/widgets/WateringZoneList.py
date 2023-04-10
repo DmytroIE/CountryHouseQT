@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QFrame, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QVBoxLayout, QWidget
 from collections import OrderedDict
 
 from src.features.Watering.widgets.WateringZone import WateringZone

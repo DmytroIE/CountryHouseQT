@@ -255,22 +255,23 @@ def watering_zone_strategy(zone, process):
         status = OnOffDeviceStatuses.SHUTDOWN
 
     # обновляем выходы
-    return {'ackn': ackn,
-            'error': error,
-            'available': available,
-            'feedback': feedback,
-            'feedback temp': feedback_temp,
-            'valve on': valve_on,
-            'progress': progress,
-            'flowrate hi timer': flowrate_hi_timer,
-            'flowrate lo timer': flowrate_lo_timer,
-            'curr state': curr_state,
-            'prev state': prev_state,
-            'state entry time': state_entry_time,
-            'raised errors': raised_errors,
-            'raised warnings': raised_warnings,
-            'status': status
-            }, alarm_log_batch
+    zone_outputs = {'ackn': ackn,
+                    'error': error,
+                    'available': available,
+                    'feedback': feedback,
+                    'feedback temp': feedback_temp,
+                    'valve on': valve_on,
+                    'progress': progress,
+                    'flowrate hi timer': flowrate_hi_timer,
+                    'flowrate lo timer': flowrate_lo_timer,
+                    'curr state': curr_state,
+                    'prev state': prev_state,
+                    'state entry time': state_entry_time,
+                    'raised errors': raised_errors,
+                    'raised warnings': raised_warnings,
+                    'status': status
+                    }
+    return zone_outputs, alarm_log_batch
 
 
 if __name__ == '__main__':
@@ -285,6 +286,7 @@ if __name__ == '__main__':
     keys_to_print = ['error', 'feedback', 'available',
                      'valve on', 'progress', 'curr state', 'prev state',
                      'status']
+
 
     class Zone(ConnectedComponent, QWidget):
         def __init__(self, store1):
@@ -356,6 +358,7 @@ if __name__ == '__main__':
 
             self._lyt_main.addLayout(self._lyt_first)
             self._lyt_main.addWidget(self._txt_view)
+
 
     class Process(ConnectedComponent, QWidget):
         def __init__(self, store1):

@@ -8,18 +8,19 @@ from src.store.ConnectedComponent import ConnectedComponent
 from src.utils.WateringStatuses import *
 
 from src.features.Watering.Reducers.WateringReducer import watering_reducer
+from src.features.Contactors.reducers.ContactorsReducer import contactors_reducer
 
 watering_durations_initial = OrderedDict({
-    'CPyCGmQ0F': OrderedDict({'LZliGv4F': {'ID': ('CPyCGmQ0F', 'LZliGv4F'), 'duration': 15},
-                              'FclCGDyZx': {'ID': ('CPyCGmQ0F', 'FclCGDyZx'), 'duration': 15},
-                              'iPyLGSJbx': {'ID': ('CPyCGmQ0F', 'iPyLGSJbx'), 'duration': 15},
-                              'Fcyi4kPtV': {'ID': ('CPyCGmQ0F', 'Fcyi4kPtV'), 'duration': 15},
-                              'iBwi42jQ1': {'ID': ('CPyCGmQ0F', 'iBwi42jQ1'), 'duration': 15}}),
-    'Lcli4yFwL': OrderedDict({'LZliGv4F': {'ID': ('Lcli4yFwL', 'LZliGv4F'), 'duration': 15},
-                              'FclCGDyZx': {'ID': ('Lcli4yFwL', 'FclCGDyZx'), 'duration': 15},
-                              'iPyLGSJbx': {'ID': ('Lcli4yFwL', 'iPyLGSJbx'), 'duration': 15},
-                              'Fcyi4kPtV': {'ID': ('Lcli4yFwL', 'Fcyi4kPtV'), 'duration': 15},
-                              'iBwi42jQ1': {'ID': ('Lcli4yFwL', 'iBwi42jQ1'), 'duration': 15}})
+    'CPyCGmQ0F': OrderedDict({'LZliGv4F': {'cycle_id': 'CPyCGmQ0F', 'zone_id': 'LZliGv4F', 'duration': 15},
+                              'FclCGDyZx': {'cycle_id': 'CPyCGmQ0F', 'zone_id': 'FclCGDyZx', 'duration': 15},
+                              'iPyLGSJbx': {'cycle_id': 'CPyCGmQ0F', 'zone_id': 'iPyLGSJbx', 'duration': 15},
+                              'Fcyi4kPtV': {'cycle_id': 'CPyCGmQ0F', 'zone_id': 'Fcyi4kPtV', 'duration': 15},
+                              'iBwi42jQ1': {'cycle_id': 'CPyCGmQ0F', 'zone_id': 'iBwi42jQ1', 'duration': 15}}),
+    'Lcli4yFwL': OrderedDict({'LZliGv4F': {'cycle_id': 'Lcli4yFwL', 'zone_id': 'LZliGv4F', 'duration': 15},
+                              'FclCGDyZx': {'cycle_id': 'Lcli4yFwL', 'zone_id': 'FclCGDyZx', 'duration': 15},
+                              'iPyLGSJbx': {'cycle_id': 'Lcli4yFwL', 'zone_id': 'iPyLGSJbx', 'duration': 15},
+                              'Fcyi4kPtV': {'cycle_id': 'Lcli4yFwL', 'zone_id': 'Fcyi4kPtV', 'duration': 15},
+                              'iBwi42jQ1': {'cycle_id': 'Lcli4yFwL', 'zone_id': 'iBwi42jQ1', 'duration': 15}})
 })
 watering_zones_initial = OrderedDict({
     'LZliGv4F': {'ID': 'LZliGv4F',
@@ -45,8 +46,8 @@ watering_zones_initial = OrderedDict({
                  'state entry time': None,
                  'raised errors': {ZoneErrorMessages.HIGH_FLOWRATE: False},
                  'raised warnings': {ZoneWarningMessages.LOW_FLOWRATE: False},
-                 'status': OnOffDeviceStatuses.STANDBY,
-                 'forced update': False},
+                 'status': OnOffDeviceStatuses.STANDBY
+                 },
     'FclCGDyZx': {'ID': 'FclCGDyZx',
                   'gpio_num': 14,
                   'name': 'Зона 2',
@@ -70,8 +71,7 @@ watering_zones_initial = OrderedDict({
                   'state entry time': None,
                   'raised errors': {ZoneErrorMessages.HIGH_FLOWRATE: False},
                   'raised warnings': {ZoneWarningMessages.LOW_FLOWRATE: False},
-                  'status': OnOffDeviceStatuses.STANDBY,
-                  'forced update': False
+                  'status': OnOffDeviceStatuses.STANDBY
                   },
     'iPyLGSJbx': {'ID': 'iPyLGSJbx',
                   'gpio_num': 15,
@@ -96,8 +96,7 @@ watering_zones_initial = OrderedDict({
                   'state entry time': None,
                   'raised errors': {ZoneErrorMessages.HIGH_FLOWRATE: False},
                   'raised warnings': {ZoneWarningMessages.LOW_FLOWRATE: False},
-                  'status': OnOffDeviceStatuses.STANDBY,
-                  'forced update': False
+                  'status': OnOffDeviceStatuses.STANDBY
                   },
     'Fcyi4kPtV': {'ID': 'Fcyi4kPtV',
                   'gpio_num': 16,
@@ -122,8 +121,7 @@ watering_zones_initial = OrderedDict({
                   'state entry time': None,
                   'raised errors': {ZoneErrorMessages.HIGH_FLOWRATE: False},
                   'raised warnings': {ZoneWarningMessages.LOW_FLOWRATE: False},
-                  'status': OnOffDeviceStatuses.STANDBY,
-                  'forced update': False
+                  'status': OnOffDeviceStatuses.STANDBY
                   },
     'iBwi42jQ1': {'ID': 'iBwi42jQ1',
                   'gpio_num': 17,
@@ -148,12 +146,12 @@ watering_zones_initial = OrderedDict({
                   'state entry time': None,
                   'raised errors': {ZoneErrorMessages.HIGH_FLOWRATE: False},
                   'raised warnings': {ZoneWarningMessages.LOW_FLOWRATE: False},
-                  'status': OnOffDeviceStatuses.STANDBY,
-                  'forced update': False
+                  'status': OnOffDeviceStatuses.STANDBY
                   }
 })
 watering_cycles_initial = OrderedDict({
     'CPyCGmQ0F': {'ID': 'CPyCGmQ0F',
+                  'ackn': False,
                   'enabled': True,
                   'active': False,
                   'hour': 6,
@@ -163,6 +161,7 @@ watering_cycles_initial = OrderedDict({
                   'prev time': None,
                   'status': OnOffDeviceStatuses.STANDBY},
     'Lcli4yFwL': {'ID': 'Lcli4yFwL',
+                  'ackn': False,
                   'enabled': True,
                   'active': False,
                   'hour': 20,
@@ -183,6 +182,7 @@ watering_process_initial = {
     'act cycle': None,
     'pump id': 'vv3GJie1',
     'active zone id': None,
+    'curr flowrate': 0.0,
     'curr state': WateringProcessStates.STANDBY,
     'prev state': WateringProcessStates.STANDBY,
     'state entry time': None,
@@ -259,11 +259,11 @@ initial_state = {
                  'cycles': watering_cycles_initial,
                  'durations': watering_durations_initial,
                  'process': watering_process_initial},
-    'el_facilities': {'contactors': contactors_initial}
+    'contactors': contactors_initial
 }
 
 root_reducer = pydux.combine_reducers({'watering': watering_reducer,
-                                       # 'el_facilities': el_facilities_reducer
+                                       'contactors': contactors_reducer
                                        })
 
 # def thunk_middleware(store):

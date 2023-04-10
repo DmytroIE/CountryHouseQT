@@ -1,50 +1,52 @@
 from src.controller.ContactorStrategy import contactor_strategy
 from src.utils.WateringStatuses import *
 
-def univ_pump_cont_strategy(pump_cont):
-    run_req_from_watering = pump_cont['run req from watering']
-    run_req_from_button = pump_cont['run request']
-    run_request = run_req_from_watering or run_req_from_button
 
+def univ_pump_cont_strategy(pump_cont):
     enabled_for_watering = pump_cont['enabled for watering']
     enabled_for_button = pump_cont['enabled']
     enabled = enabled_for_watering or enabled_for_button
+
+    run_req_from_watering = pump_cont['run req from watering']
+    run_req_from_button = pump_cont['run request']
+    run_request = (run_req_from_watering and enabled_for_watering) or \
+                  (run_req_from_button and enabled_for_button)
 
     contactor = pump_cont.copy()
     contactor['run request'] = run_request
     contactor['enabled'] = enabled
     contactor['feedback'] = EnableDevFeedbacks.PENDING
 
-    cont_updated_outputs, alarm_log_batch = contactor_strategy(contactor)
+    cont_outputs, alarm_log_batch = contactor_strategy(contactor)
 
-    feedback_for_watering = cont_updated_outputs['feedback']
+    feedback_for_watering = cont_outputs['feedback']
     if not run_req_from_watering:
-        if cont_updated_outputs['feedback'] is EnableDevFeedbacks.RUN:
+        if cont_outputs['feedback'] is EnableDevFeedbacks.RUN:
             feedback_for_watering = EnableDevFeedbacks.NOT_STOP
-        elif cont_updated_outputs['feedback'] is EnableDevFeedbacks.NOT_RUN:
+        elif cont_outputs['feedback'] is EnableDevFeedbacks.NOT_RUN:
             feedback_for_watering = EnableDevFeedbacks.STOP
     else:
-        if cont_updated_outputs['feedback'] is EnableDevFeedbacks.STOP:
+        if cont_outputs['feedback'] is EnableDevFeedbacks.STOP:
             feedback_for_watering = EnableDevFeedbacks.NOT_RUN
-        elif cont_updated_outputs['feedback'] is EnableDevFeedbacks.NOT_STOP:
+        elif cont_outputs['feedback'] is EnableDevFeedbacks.NOT_STOP:
             feedback_for_watering = EnableDevFeedbacks.RUN
-    cont_updated_outputs['feedback for watering'] = feedback_for_watering
+    cont_outputs['feedback for watering'] = feedback_for_watering
 
-    feedback_for_button = cont_updated_outputs['feedback']
+    feedback_for_button = cont_outputs['feedback']
     if not run_req_from_button:
-        if cont_updated_outputs['feedback'] is EnableDevFeedbacks.RUN:
+        if cont_outputs['feedback'] is EnableDevFeedbacks.RUN:
             feedback_for_button = EnableDevFeedbacks.NOT_STOP
-        elif cont_updated_outputs['feedback'] is EnableDevFeedbacks.NOT_RUN:
+        elif cont_outputs['feedback'] is EnableDevFeedbacks.NOT_RUN:
             feedback_for_button = EnableDevFeedbacks.STOP
     else:
-        if cont_updated_outputs['feedback'] is EnableDevFeedbacks.STOP:
+        if cont_outputs['feedback'] is EnableDevFeedbacks.STOP:
             feedback_for_button = EnableDevFeedbacks.NOT_RUN
-        elif cont_updated_outputs['feedback'] is EnableDevFeedbacks.NOT_STOP:
+        elif cont_outputs['feedback'] is EnableDevFeedbacks.NOT_STOP:
             feedback_for_button = EnableDevFeedbacks.RUN
-    cont_updated_outputs['feedback'] = feedback_for_button
+    cont_outputs['feedback'] = feedback_for_button
 
     # обновляем выходы
-    return cont_updated_outputs, alarm_log_batch
+    return cont_outputs, alarm_log_batch
 
 
 if __name__ == '__main__':
@@ -110,7 +112,7 @@ if __name__ == '__main__':
 
             self._updated_widgets_map = {}
 
-            self._btn_enable_for_b = QPushButton('Enable for b')
+            self._btn_enable_for_b = QPushButton('Enable')
             self._btn_enable_for_b.clicked.connect(
                 lambda: self._dispatch({'type': 'pump/UPDATE',
                                         'payload':

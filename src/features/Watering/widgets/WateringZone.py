@@ -1,10 +1,9 @@
-from PyQt5.QtGui import QDoubleValidator
 from PyQt5.QtWidgets import QFrame, QHBoxLayout, QLabel, QDoubleSpinBox, QProgressBar, QPushButton, QWidget, \
-    QStackedLayout, QSpinBox, QToolButton
+    QStackedLayout, QToolButton
 from PyQt5.QtCore import Qt
 
 from src.utils.WateringStatuses import *
-from src.utils.Buttons import *
+from src.utils.Buttons import change_toggle_button_style
 
 
 class WateringZone(QFrame):
@@ -14,9 +13,9 @@ class WateringZone(QFrame):
         self._id = data['ID']
         self._create_ui(data, on_update)
 
-    @property
-    def widget_id(self):
-        return self._id
+    # @property
+    # def widget_id(self):
+    #     return self._id
 
     def _create_ui(self, data, on_update):
         self._cached = {'enabled': data['enabled']}
@@ -84,7 +83,8 @@ class WateringZone(QFrame):
 
         self.apply_updates(data)  # чтобы не дублировать код, пользуемся уже готовой функцией
 
-        # эти строки обязательно после self.apply_updates, иначе при записи в спинбокс возникнет бесконечный цикл
+        # эти строки обязательно после self.apply_updates, иначе при записи в спинбокс
+        # возникнет бесконечный цикл
         self._spb_lo_flow.valueChanged.connect(
             lambda: on_update(ID=self._id, new_data={'lo lim flowrate': self._spb_lo_flow.value()})
         )
@@ -108,7 +108,7 @@ class WateringZone(QFrame):
         self._spb_lo_flow.setValue(new_data['lo lim flowrate'])
         self._spb_hi_flow.setValue(new_data['hi lim flowrate'])
         self._lbl_gpio.setText(f'GPIO {new_data["gpio_num"]}')
-        self._btn_name.setText(f'{new_data["name"]}')
+        self._btn_name.setText(new_data['name'])
 
         change_toggle_button_style(new_data['enabled'],
                                    self._btn_name,

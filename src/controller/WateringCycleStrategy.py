@@ -19,8 +19,6 @@ def watering_cycle_strategy(cycle, cycles, process):
 
     alarm_log_batch = []
 
-    curr_time = QTime.currentTime()
-
     # Автомат
     while True:
         again = False
@@ -34,19 +32,23 @@ def watering_cycle_strategy(cycle, cycles, process):
                 prev_state = curr_state
 
             # Постоянные действия
-            activation_time = QTime(hour, minute)
+            curr_time = QTime.currentTime()
+            activation_time = QTime(hour, minute, 0, 0)
             if not prev_time:
                 prev_time = curr_time
+            # print(f'to curr {activation_time.msecsTo(curr_time)}')
+            #
+            # print(f'tu prev {activation_time.msecsTo(prev_time)}')
 
             # Переходы
-            if (activation_time.msecsTo(curr_time) <= 0 and
-                activation_time.msecsTo(prev_time)) >= 0:
+            if (activation_time.msecsTo(curr_time) >= 0) and \
+                    (activation_time.msecsTo(prev_time) <= 0):
                 any_other_active_cycle = False
-                for c_id, c in cycles:
+                for c_id, c in cycles.items():
                     if c is not cycle:
                         if c['active']:
                             any_other_active_cycle = True
-
+                print(f'{any_other_active_cycle=}')
                 if not enabled or \
                         not process['available'] or \
                         process['error'] or \
@@ -55,6 +57,7 @@ def watering_cycle_strategy(cycle, cycles, process):
                     ready_to_execute = False
                 else:
                     ready_to_execute = True
+                print(f'{ready_to_execute=}')
                 if ready_to_execute:
                     curr_state = CycleStates.EXECUTE
                     again = True
@@ -62,6 +65,9 @@ def watering_cycle_strategy(cycle, cycles, process):
                     alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
                                             'dt_stamp': QDateTime.currentDateTime(),
                                             'text': f'Полив {hour}:{minute} отменен'})
+                    again = False
+            else:
+                again = False
             prev_time = curr_time
 
         if curr_state is CycleStates.EXECUTE:
@@ -93,11 +99,11 @@ def watering_cycle_strategy(cycle, cycles, process):
             # Единоразовые действия при входе в шаг
             if curr_state is not prev_state:
                 process_outputs['act cycle'] = None
-                active = False
                 prev_state = curr_state
 
             # Переходы
             if process['feedback'] is ExecDevFeedbacks.FINISHED:
+                active = False
                 curr_state = CycleStates.STANDBY
                 again = True
 
@@ -115,10 +121,11 @@ def watering_cycle_strategy(cycle, cycles, process):
         status = OnOffDeviceStatuses.SHUTDOWN
 
     # обновляем выходы
-    return {'ackn': ackn,
-            'active': active,
-            'curr state': curr_state,
-            'prev state': prev_state,
-            'prev time': prev_time,
-            'status': status
-            }, process_outputs, alarm_log_batch
+    cycle_outputs = {'ackn': ackn,
+                     'active': active,
+                     'curr state': curr_state,
+                     'prev state': prev_state,
+                     'prev time': prev_time,
+                     'status': status
+                     }
+    return cycle_outputs, process_outputs, alarm_log_batch

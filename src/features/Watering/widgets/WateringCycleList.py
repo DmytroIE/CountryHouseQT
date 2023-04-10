@@ -1,20 +1,19 @@
-from PyQt5.QtWidgets import QFrame, QHBoxLayout, QWidget
+from PyQt5.QtWidgets import QHBoxLayout, QWidget
+from collections import OrderedDict
 
 from src.features.Watering.widgets.WateringCycle import WateringCycle
 from src.store.store import ConnectedToStoreComponent
 
 
-def create_watering_cycle(ID, data, index, on_update, on_delete, parent):
-    return WateringCycle(index=index + 1,
-                         data=data,
-                         on_update=lambda new_data: on_update(ID=ID, new_data=new_data),
-                         on_delete=lambda: on_delete(ID=ID),
+def create_watering_cycle(data, on_update, parent):
+    return WateringCycle(data=data,
+                         on_update=lambda ID, new_data: on_update(ID, new_data),
                          parent=parent)
 
 
 class WateringCycleList(ConnectedToStoreComponent, QWidget):
 
-    def __init__(self, store, parent=None):
+    def __init__(self, parent=None):
         QWidget.__init__(self, parent)
         ConnectedToStoreComponent.__init__(self)
 
@@ -22,46 +21,29 @@ class WateringCycleList(ConnectedToStoreComponent, QWidget):
 
         self._lyt_main = QHBoxLayout(self)
         self._lyt_main.setContentsMargins(0, 0, 0, 0)
-
-        self._children = []
+        self._children = OrderedDict({})
 
         self._updater()
 
-    def _on_delete_item(self, ID):
-        self._dispatch({'type': 'wateringcycles/DELETE_ITEM', 'payload': ID})
-
     def _on_update_item(self, ID, new_data):
-        self._dispatch({'type': 'wateringcycles/UPDATE_ITEM', 'payload': {'ID': ID, 'new_data': new_data}})
+        self._dispatch({'type': 'wateringcycles/UPDATE_ITEM',
+                        'payload': {'ID': ID, 'new_data': new_data}})
 
     def _get_own_state(self):  # selector
         return self._get_store_state()['watering']['cycles']
 
-    def _on_state_update(self, new_state, list_, action):
+    def _on_state_update(self, new_state, list_of_ids, action):
         if action == 'ADD':
-            for ind, item in enumerate(list_):
-                if isinstance(item, dict):
-                    new_widget = create_watering_cycle(
-                        new_state[item['index_of_new_item']]['ID'],
-                        new_state[item['index_of_new_item']],
-                        ind,
-                        self._on_update_item,
-                        self._on_delete_item,
-                        self)
-                    self._children.insert(item['index_of_new_item'], new_widget)
-                else:
-                    self._children[ind].update_index(ind + 1)
-            for ind2, item2 in enumerate(self._children):
-                self._lyt_main.addWidget(item2)
+            for cycle_id in list_of_ids:
+                new_widget = create_watering_cycle(
+                    new_state[cycle_id],
+                    self._on_update_item,
+                    self)
+                self._children[cycle_id] = new_widget
 
-        elif action == 'DELETE':
-            for index_of_deleted_item in list_:
-                self._lyt_main.removeWidget(self._children[index_of_deleted_item])
-                self._children[index_of_deleted_item].deleteLater()
-                self._children.pop(index_of_deleted_item)
-            for ind, item in enumerate(self._children):
-                self._children[ind].update_index(ind + 1)
+            for _, item in self._children.items():
+                self._lyt_main.addWidget(item)
 
         elif action == 'UPDATE':
-            for ind, child in enumerate(self._children):
-                if list_[ind] is not None:
-                    self._children[ind].apply_updates(list_[ind])
+            for cycle_id in list_of_ids:
+                self._children[cycle_id].apply_updates(new_state[cycle_id])

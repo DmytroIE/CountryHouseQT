@@ -1,35 +1,19 @@
 from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import QTabWidget
+from PyQt5.QtWidgets import QTabWidget, QPushButton
 
 
 from src.features.Watering.widgets.Watering import Watering
 from src.features.AlarmLog.widgets.AlarmLog import AlarmLog
+from src.features.TestWindow.widgets.TestWatering import TestWatering
 
 
 class MainWidget(QtWidgets.QWidget):
 
     def __init__(self, **kwargs):
         QtWidgets.QWidget.__init__(self)
-        self.setStyleSheet('.StandardButton {\
-                                                 background-color: rgb(250,250,250);\
-                                                 border-style: solid;\
-                                                 border-width: 1px;\
-                                                 border-radius: 4px;\
-                                                 border-color: rgb(180,180,180);\
-                                                 padding: 4px;\
-                                                 }\
-                                   .StandardButton:hover {\
-                                                 border-color: rgb(190,250,210);\
-                                                 background-color: rgb(230,240,240);\
-                                                 }\
-                                   .EnabledButton {\
-                                                 border-color: rgb(150,225,211);\
-                                                 background-color: rgb(193, 225, 211);\
-                                                }\
-                                   .EnabledButton:hover{\
-                                                  border-color: rgb(130,205,191);\
-                                                  background-color: rgb(163, 195, 201);}')
+        self._create_ui()
 
+    def _create_ui(self):
         self._lyt_main = QtWidgets.QVBoxLayout(self)
         self._tab_main = QTabWidget(self)
 
@@ -43,3 +27,16 @@ class MainWidget(QtWidgets.QWidget):
 
         self._lyt_main.addWidget(self._tab_main)
         self._lyt_main.addWidget(self._wdg_alarm_log)
+
+        # Test window
+        self._test_window = None
+        self._btn_test_watering = QPushButton('Тест полив')
+        self._btn_test_watering.clicked.connect(self._create_test_window)
+        self._lyt_main.addWidget(self._btn_test_watering)
+
+    def _create_test_window(self):
+        if self._test_window is None:
+            self._test_window = TestWatering()
+        self._test_window.show()
+
+

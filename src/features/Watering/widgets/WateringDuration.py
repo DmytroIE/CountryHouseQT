@@ -6,6 +6,11 @@ class WateringDuration(QFrame):
 
     def __init__(self, data, on_update, parent=None):
         super().__init__(parent)
+        self._cycle_id = data['cycle_id']
+        self._zone_id = data['zone_id']
+        self._create_ui(data, on_update)
+
+    def _create_ui(self, data, on_update):
 
         self.setFrameStyle(QFrame.Panel | QFrame.Raised)
         self._lyt_main = QVBoxLayout(self)
@@ -16,7 +21,10 @@ class WateringDuration(QFrame):
 
         self.apply_updates(data)
 
-        self._spb_duration.valueChanged.connect(lambda: on_update(new_data={'duration': self._spb_duration.value()}))
+        self._spb_duration.valueChanged.connect(
+            lambda: on_update(self._cycle_id,
+                              self._zone_id,
+                              {'duration': self._spb_duration.value()}))
 
         self._lyt_main.addWidget(self._spb_duration)
 

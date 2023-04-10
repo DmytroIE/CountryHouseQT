@@ -40,11 +40,11 @@ class AlarmLog(ConnectedToStoreComponent, QWidget):
     # временная функция для проверки добавления или удаления виджета в wateringzonelist
     # функции обработки нажатия на кнопки содержат пока проверочный код
     def _on_ackn(self):
-        pass
+        self._dispatch({'type': 'alarmlog/ACKNOWLEDGEMENT'})
 
     def _on_clear(self):
         pass
 
     def _updater(self):
-        print('updater alarm log')
+        #print('updater alarm log')
         pass
