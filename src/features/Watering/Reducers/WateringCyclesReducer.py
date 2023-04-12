@@ -19,7 +19,7 @@ def watering_cycles_reducer(state=None, action=None):
             return state
     elif action['type'] == 'wateringcycles/ACKNOWLEDGEMENT':
         new_state = state.copy()
-        for cycle_id, cycle in new_state:
+        for cycle_id, cycle in new_state.items():
             new_cycle = cycle.copy()
             new_state[cycle_id] = {**new_cycle, **({'ackn': True})}
         return new_state

@@ -20,6 +20,8 @@ def watering_cycle_strategy(cycle, cycles, process):
 
     alarm_log_batch = []
 
+    curr_time = QDateTime.currentDateTime()
+
     # Автомат
     while True:
         again = False
@@ -28,13 +30,13 @@ def watering_cycle_strategy(cycle, cycles, process):
             # Единоразовые действия при входе в шаг
             if curr_state is not prev_state:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
-                                        'text': f'Полив {hour:02d}:{minute:02d} завершен'})
+                                        'dt_stamp': curr_time,
+                                        'text': f'Cycle: Полив {hour:02d}:{minute:02d} завершен'})
                 prev_state = curr_state
 
             # Постоянные действия
-            curr_time = QTime.currentTime()
-            activation_time = QTime(hour, minute, 0, 0)
+            curr_time = curr_time
+            activation_time = QDateTime(curr_time.date(), QTime(hour, minute, 0))
             if not prev_time:
                 prev_time = curr_time
 
@@ -61,8 +63,8 @@ def watering_cycle_strategy(cycle, cycles, process):
                     again = True
                 else:
                     alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                            'dt_stamp': QDateTime.currentDateTime(),
-                                            'text': f'Cycle:Полив {hour:02d}:{minute:02d} отменен'})
+                                            'dt_stamp': curr_time,
+                                            'text': f'Cycle: Полив {hour:02d}:{minute:02d} не состоялся'})
                     again = False
             else:
                 again = False
@@ -72,8 +74,8 @@ def watering_cycle_strategy(cycle, cycles, process):
             # Единоразовые действия при входе в шаг
             if curr_state is not prev_state:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
-                                        'text': f'Cycle:Полив {hour:02d}:{minute:02d} начат'})
+                                        'dt_stamp': curr_time,
+                                        'text': f'Cycle: Полив {hour:02d}:{minute:02d} начат'})
                 process_outputs['act cycle ID'] = cycle_id
                 active = True
                 prev_state = curr_state
@@ -81,15 +83,15 @@ def watering_cycle_strategy(cycle, cycles, process):
             # Переходы
             if process['feedback'] is ExecDevFeedbacks.DONE:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
-                                        'text': f'Cycle:Полив {hour:02d}:{minute:02d} выполнен'})
+                                        'dt_stamp': curr_time,
+                                        'text': f'Cycle: Полив {hour:02d}:{minute:02d} выполнен'})
                 curr_state = CycleStates.SHUTDOWN
                 again = True
             elif not enabled or \
                     process['feedback'] is ExecDevFeedbacks.ABORTED:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
-                                        'text': f'Cycle:Полив {hour:02d}:{minute:02d} отменен'})
+                                        'dt_stamp': curr_time,
+                                        'text': f'Cycle: Полив {hour:02d}:{minute:02d} отменен'})
                 curr_state = CycleStates.SHUTDOWN
                 again = True
 

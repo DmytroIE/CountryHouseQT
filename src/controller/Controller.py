@@ -23,11 +23,11 @@ class Controller(ConnectedToStoreComponent):
         self._one_second_timer.start(250)
 
     def _on_timer_tick(self):
-        next(self._cyclic_list_of_strategies)()
-        # try:
-        #     next(self._cyclic_list_of_strategies)()
-        # except Exception as e:
-        #     print(f'Ошибка выполнения, {e}')
+        # next(self._cyclic_list_of_strategies)()
+        try:
+            next(self._cyclic_list_of_strategies)()
+        except Exception as e:
+            print(f'Ошибка выполнения, {e}')
 
     def _run_zones(self):
         # print('zones')

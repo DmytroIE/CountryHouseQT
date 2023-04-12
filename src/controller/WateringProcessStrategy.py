@@ -26,8 +26,11 @@ def watering_process_strategy(process, zones, pump, durations):
     zones_outputs = {}
     for zone_id, zone in zones.items():
         zones_outputs[zone_id] = {'exec request': zone['exec request'],
-                                  'duration': zone['duration']}
+                                  'duration': zone['duration'],
+                                  'control flowrate': zone['control flowrate']}
     alarm_log_batch = []
+
+    curr_time = QDateTime.currentDateTime()
 
     # Квитирование
     if ackn:
@@ -41,7 +44,7 @@ def watering_process_strategy(process, zones, pump, durations):
                             alarm_log_batch.append({'type': LogAlarmMessageTypes.ERROR_OUT,
                                                     'alarm ID': key,
                                                     'equip ID': process_id,
-                                                    'dt_stamp': QDateTime.currentDateTime(),
+                                                    'dt_stamp': curr_time,
                                                     'text': 'OUT:' + key.value})
                         else:
                             error_test = True
@@ -95,7 +98,7 @@ def watering_process_strategy(process, zones, pump, durations):
                         alarm_log_batch.append({'type': LogAlarmMessageTypes.ERROR_IN,
                                                 'alarm ID': key,
                                                 'equip ID': process_id,
-                                                'dt_stamp': QDateTime.currentDateTime(),
+                                                'dt_stamp': curr_time,
                                                 'text': 'IN:' + key.value})
                         error_test = True
             if error_test:
@@ -110,7 +113,7 @@ def watering_process_strategy(process, zones, pump, durations):
             # Единоразовые действия при входе в шаг
             if curr_state is not prev_state:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Process: Полив завершен'})
                 prev_state = curr_state
 
@@ -129,11 +132,11 @@ def watering_process_strategy(process, zones, pump, durations):
             # Единоразовые действия при входе в шаг
             if curr_state is not prev_state:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Process: Подача сигнала запуска на насос'})
                 pump_outputs['run req from watering'] = True
                 feedback = ExecDevFeedbacks.BUSY
-                state_entry_time = QTime.currentTime()
+                state_entry_time = curr_time
                 prev_state = curr_state
 
             # Постоянные действия
@@ -141,7 +144,7 @@ def watering_process_strategy(process, zones, pump, durations):
             # Переходы
             if not available or not act_cycle_id:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Process: Полив отменен при запуске'})
                 pump_outputs['run req from watering'] = False
                 feedback_temp = ExecDevFeedbacks.ABORTED
@@ -153,9 +156,9 @@ def watering_process_strategy(process, zones, pump, durations):
                 curr_state = WateringProcessStates.RESETTING
                 again = True
             elif pump['feedback for watering'] is EnableDevFeedbacks.RUN and \
-                    state_entry_time.secsTo(QTime.currentTime()) >= SP_STATE_TRANSITION_TYPICAL_DELAY:
+                    state_entry_time.secsTo(curr_time) >= SP_STATE_TRANSITION_TYPICAL_DELAY:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Process: Насос запущен'})
                 # специальная задержка, чтобы побыть какое-то время в этом состоянии
                 curr_state = WateringProcessStates.OPEN_BALL_VALVE
@@ -168,10 +171,10 @@ def watering_process_strategy(process, zones, pump, durations):
             # Единоразовые действия при входе в шаг
             if curr_state is not prev_state:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Process: Подача сигнала открытия на шаровый кран'})
                 ball_valve_on = True
-                state_entry_time = QTime.currentTime()
+                state_entry_time = curr_time
                 prev_state = curr_state
 
             # Постоянные действия
@@ -179,7 +182,7 @@ def watering_process_strategy(process, zones, pump, durations):
             # Переходы
             if not available or not act_cycle_id:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Process: Полив отменен при запуске'})
                 feedback_temp = ExecDevFeedbacks.ABORTED
                 curr_state = WateringProcessStates.CLOSE_BALL_VALVE
@@ -188,10 +191,10 @@ def watering_process_strategy(process, zones, pump, durations):
                 feedback_temp = ExecDevFeedbacks.ABORTED
                 curr_state = WateringProcessStates.CLOSE_BALL_VALVE
                 again = True
-            elif state_entry_time.secsTo(QTime.currentTime()) >= SP_STATE_TRANSITION_TYPICAL_DELAY:
+            elif state_entry_time.secsTo(curr_time) >= SP_STATE_TRANSITION_TYPICAL_DELAY:
                 # специальная задержка, чтобы побыть какое-то время в этом состоянии
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Process: Сигнал открытия шарового крана подан'})
                 curr_state = WateringProcessStates.WATER_ZONE
                 again = True
@@ -203,17 +206,19 @@ def watering_process_strategy(process, zones, pump, durations):
             # Единоразовые действия при входе в шаг
             if curr_state is not prev_state:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Process: Поиск активной зоны для полива'})
                 act_zone_id = None
                 for zone_id, zone in zones.items():
                     if zone['available']:
-                        if zone['available'] and zone['feedback'] is ExecDevFeedbacks.FINISHED:
+                        if zone['available'] and not zone['error'] and \
+                                zone['feedback'] is ExecDevFeedbacks.FINISHED:
                             act_zone_id = zone_id
                             zones_outputs[act_zone_id]['exec request'] = True
                             zones_outputs[act_zone_id]['duration'] = durations[act_cycle_id][act_zone_id]['duration']
+                            zones_outputs[act_zone_id]['control flowrate'] = True
                             alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                                    'dt_stamp': QDateTime.currentDateTime(),
+                                                    'dt_stamp': curr_time,
                                                     'text': f'Process: Подача сигнала запуска на зону {zone["name"]}'})
                             break
                 prev_state = curr_state
@@ -223,14 +228,14 @@ def watering_process_strategy(process, zones, pump, durations):
             # Переходы
             if not act_zone_id:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Process: Полив выполнен, больше зон для полива не осталось'})
                 feedback_temp = ExecDevFeedbacks.DONE
                 curr_state = WateringProcessStates.CLOSE_BALL_VALVE
                 again = True
             elif not available or not act_cycle_id:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Process: Полив отменен во время работы'})
                 feedback_temp = ExecDevFeedbacks.ABORTED
                 curr_state = WateringProcessStates.CLOSE_BALL_VALVE
@@ -251,9 +256,9 @@ def watering_process_strategy(process, zones, pump, durations):
             # Единоразовые действия при входе в шаг
             if curr_state is not prev_state:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Process: Смена активной зоны'})
-                state_entry_time = QTime.currentTime()
+                state_entry_time = curr_time
                 prev_state = curr_state  # Нужно, чтобы опять прийти в WateringStates.WATER_ZONE и выполнить един дей
 
             # Постоянные действия
@@ -261,7 +266,7 @@ def watering_process_strategy(process, zones, pump, durations):
             # Переходы
             if not available or not act_cycle_id:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Полив отменен'})
                 feedback_temp = ExecDevFeedbacks.ABORTED
                 curr_state = WateringProcessStates.CLOSE_BALL_VALVE
@@ -270,7 +275,7 @@ def watering_process_strategy(process, zones, pump, durations):
                 feedback_temp = ExecDevFeedbacks.ABORTED
                 curr_state = WateringProcessStates.CLOSE_BALL_VALVE
                 again = True
-            elif state_entry_time.secsTo(QTime.currentTime()) >= SP_STATE_TRANSITION_TYPICAL_DELAY:
+            elif state_entry_time.secsTo(curr_time) >= SP_STATE_TRANSITION_TYPICAL_DELAY:
                 # специальная задержка, чтобы побыть какое-то время в этом состоянии
                 curr_state = WateringProcessStates.WATER_ZONE
                 again = True
@@ -282,17 +287,17 @@ def watering_process_strategy(process, zones, pump, durations):
             # Единоразовые действия при входе в шаг
             if curr_state is not prev_state:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Process: Снятие сигнала открытия с шарового крана'})
                 ball_valve_on = False
-                state_entry_time = QTime.currentTime()
+                state_entry_time = curr_time
                 prev_state = curr_state
 
             # Переходы
-            if state_entry_time.secsTo(QTime.currentTime()) >= SP_STATE_TRANSITION_TYPICAL_DELAY:
+            if state_entry_time.secsTo(curr_time) >= SP_STATE_TRANSITION_TYPICAL_DELAY:
                 # специальная задержка, чтобы побыть какое-то время в этом состоянии
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Process: Сигнал открытия с шарового крана снят'})
                 curr_state = WateringProcessStates.RESET_ZONES_AFTER_WATERING
                 again = True
@@ -304,18 +309,18 @@ def watering_process_strategy(process, zones, pump, durations):
             # Единоразовые действия при входе в шаг
             if curr_state is not prev_state:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Process: Снятие сигнала запуска с зон'})
                 for zone_id, zone in zones.items():
                     zones_outputs[zone_id]['exec request'] = False
-                state_entry_time = QTime.currentTime()
+                state_entry_time = curr_time
                 prev_state = curr_state
 
             # Переходы
-            if state_entry_time.secsTo(QTime.currentTime()) >= SP_STATE_TRANSITION_TYPICAL_DELAY:
+            if state_entry_time.secsTo(curr_time) >= SP_STATE_TRANSITION_TYPICAL_DELAY:
                 # специальная задержка, чтобы побыть какое-то время в этом состоянии
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Process: Сигнал запуска с зон снят'})
                 curr_state = WateringProcessStates.STOP_PUMP
                 again = True
@@ -327,18 +332,18 @@ def watering_process_strategy(process, zones, pump, durations):
             # Единоразовые действия при входе в шаг
             if curr_state is not prev_state:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
-                                        'text': f'Process: Снятие сигнала запуска с насоса'})
+                                        'dt_stamp': curr_time,
+                                        'text': f'Process: Снятие сигнала запуска насоса'})
                 pump_outputs['run req from watering'] = False
-                state_entry_time = QTime.currentTime()
+                state_entry_time = curr_time
                 prev_state = curr_state
 
             # Переходы
-            if state_entry_time.secsTo(QTime.currentTime()) >= SP_STATE_TRANSITION_TYPICAL_DELAY:
+            if state_entry_time.secsTo(curr_time) >= SP_STATE_TRANSITION_TYPICAL_DELAY:
                 # специальная задержка, чтобы побыть какое-то время в этом состоянии
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
-                                        'text': f'Process: Сигнал запуска с насоса снят'})
+                                        'dt_stamp': curr_time,
+                                        'text': f'Process: Сигнал запуска насоса снят'})
                 curr_state = WateringProcessStates.PRESSURE_RELIEF
                 again = True
             else:
@@ -349,17 +354,19 @@ def watering_process_strategy(process, zones, pump, durations):
             # Единоразовые действия при входе в шаг
             if curr_state is not prev_state:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Process: Поиск доступной зоны для сброса давления'})
                 act_zone_id = None
                 for zone_id, zone in zones.items():
                     if zone['available']:
-                        if zone['available'] and zone['feedback'] is ExecDevFeedbacks.FINISHED:
+                        if zone['available'] and not zone['error'] and \
+                                zone['feedback'] is ExecDevFeedbacks.FINISHED:
                             act_zone_id = zone_id
                             zones_outputs[act_zone_id]['exec request'] = True
                             zones_outputs[act_zone_id]['duration'] = PRESSURE_RELIEF_DURATION
+                            zones_outputs[act_zone_id]['control flowrate'] = False
                             alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                                    'dt_stamp': QDateTime.currentDateTime(),
+                                                    'dt_stamp': curr_time,
                                                     'text': f'Process: Подача сигнала запуска на зону {zone["name"]}'})
                             break
                 prev_state = curr_state
@@ -369,15 +376,20 @@ def watering_process_strategy(process, zones, pump, durations):
             # Переходы
             if not act_zone_id:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Process: Сброс давления отменен, нет ни одной доступной зоны'})
                 curr_state = WateringProcessStates.RESET_ZONES_AFTER_PRESSURE_RELIEF
                 again = True
-            elif zones[act_zone_id]['feedback'] is ExecDevFeedbacks.DONE or \
-                    zones[act_zone_id]['feedback'] is ExecDevFeedbacks.ABORTED:
+            elif zones[act_zone_id]['feedback'] is ExecDevFeedbacks.DONE:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Process: Сброс давления выполнен'})
+                curr_state = WateringProcessStates.RESET_ZONES_AFTER_PRESSURE_RELIEF
+                again = True
+            elif zones[act_zone_id]['feedback'] is ExecDevFeedbacks.ABORTED:
+                alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
+                                        'dt_stamp': curr_time,
+                                        'text': f'Process: Сброс давления отменен'})
                 curr_state = WateringProcessStates.RESET_ZONES_AFTER_PRESSURE_RELIEF
                 again = True
             else:
@@ -388,18 +400,18 @@ def watering_process_strategy(process, zones, pump, durations):
             # Единоразовые действия при входе в шаг
             if curr_state is not prev_state:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Process: Снятие сигнала запуска с зон после сброса давления'})
                 for zone_id, zone in zones.items():
                     if zone['exec request']:
                         zones_outputs[zone_id]['exec request'] = False
-                state_entry_time = QTime.currentTime()
+                state_entry_time = curr_time
                 prev_state = curr_state
 
             # Переходы
-            if state_entry_time.secsTo(QTime.currentTime()) >= SP_STATE_TRANSITION_TYPICAL_DELAY:
+            if state_entry_time.secsTo(curr_time) >= SP_STATE_TRANSITION_TYPICAL_DELAY:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Process: Сигнал запуска с зон после сброса давления снят'})
                 # специальная задержка, чтобы побыть какое-то время в этом состоянии
                 curr_state = WateringProcessStates.RESETTING
@@ -441,8 +453,11 @@ def watering_process_strategy(process, zones, pump, durations):
     elif prev_state is WateringProcessStates.STOP_PUMP or \
             prev_state is WateringProcessStates.CLOSE_BALL_VALVE or \
             prev_state is WateringProcessStates.RESET_ZONES_AFTER_WATERING or \
-            prev_state is WateringProcessStates.RESET_ZONES_AFTER_PRESSURE_RELIEF:
+            prev_state is WateringProcessStates.RESET_ZONES_AFTER_PRESSURE_RELIEF or \
+            prev_state is WateringProcessStates.RESETTING:
         status = OnOffDeviceStatuses.SHUTDOWN
+    elif prev_state is WateringProcessStates.PRESSURE_RELIEF:
+        status = OnOffDeviceStatuses.PRESSURE_RELIEF
 
     # обновляем выходы
     process_outputs = {'ackn': ackn,

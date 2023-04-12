@@ -1,4 +1,5 @@
 from PyQt5 import QtWidgets
+from PyQt5.QtCore import QLocale
 from PyQt5.QtWidgets import QApplication, QMainWindow
 
 import sys
@@ -17,6 +18,11 @@ class MainWindow(QMainWindow):
         self._wdg_main = MainWidget()
 
         self.setCentralWidget(self._wdg_main)
+        locale = QLocale(QLocale.Ukrainian, QLocale.Ukraine)
+        QLocale.setDefault(locale)
+        # print(locale.country())
+        # print(locale.language())
+        # print(locale.name())
 
 
 if __name__ == '__main__':

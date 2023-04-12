@@ -76,7 +76,7 @@ class ConnectedComponent:
                         else:  # значит, изменился существующий элемент словаря или порядок элементов,
                             # но количество элементов не поменялось
                             updated_keys_list = []
-                            for key, _ in new_state.items():
+                            for key in new_state:
                                 if isinstance(new_state[key], (int, float, str, bool)):
                                     if self._cached[key] != new_state[key]:
                                         updated_keys_list.append(key)
@@ -106,7 +106,7 @@ class ConnectedComponent:
 
                         else:  # значит, изменился существующий элемент словаря, но количество элементов не поменялось
                             updated_keys_list = []
-                            for key, _ in new_state.items():
+                            for key in new_state:
                                 if isinstance(new_state[key], (int, float, str, bool)):
                                     if self._cached[key] != new_state[key]:
                                         updated_keys_list.append(key)

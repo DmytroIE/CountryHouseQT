@@ -18,8 +18,9 @@ class OnOffDeviceStatuses(Enum):
     STANDBY = 'В ожидании'
     STARTUP = 'Запуск'
     RUN = 'Работа'
-    SHUTDOWN = 'Выключение'
+    SHUTDOWN = 'Завершение'
     FAULTY = 'Неисправность'
+    PRESSURE_RELIEF = 'Сброс давления'
 
 
 class EnableDevFeedbacks(Enum):

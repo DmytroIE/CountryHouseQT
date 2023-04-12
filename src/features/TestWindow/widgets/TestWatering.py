@@ -3,14 +3,16 @@ from PyQt5.QtWidgets import \
 from src.store.store import ConnectedToStoreComponent
 from src.utils.Buttons import *
 
-pump_keys_to_print = ['run req from watering', 'available', 'error', 'cont on', 'feedback', 'feedback for watering',
-                      'curr state', 'prev state', 'cont no fdbk timer', 'cont fdbk not off timer',
-                      'status']
-process_keys_to_print = ['available', 'error', 'feedback', 'act cycle ID', 'active zone id',
+pump_keys_to_print = ['ackn', 'run req from watering', 'available', 'error', 'cont on', 'feedback',
+                      'feedback for watering', 'curr state', 'prev state', 'cont no fdbk timer',
+                      'cont fdbk not off timer', 'status']
+process_keys_to_print = ['ackn', 'available', 'error', 'feedback', 'act cycle ID', 'active zone id',
                          'ball valve on', 'curr state', 'prev state',
                          'status']
 act_cycle_keys_to_print = ['active', 'hour', 'minute', 'curr state', 'prev state', 'status']
-act_zone_keys_to_print = ['exec request', 'available', 'error', 'feedback', 'curr state', 'prev state', 'status']
+act_zone_keys_to_print = ['ackn', 'exec request', 'available', 'error', 'feedback', 'curr state', 'prev state',
+                          'status']
+
 
 class TestWatering(ConnectedToStoreComponent, QWidget):
     def __init__(self):

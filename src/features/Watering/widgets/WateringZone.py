@@ -11,15 +11,12 @@ class WateringZone(QFrame):
     def __init__(self, data, on_update, parent=None):
         super().__init__(parent)
         self._id = data['ID']
+        self._cached_for_widget = {'status': None, 'progress': None,
+                                   'enabled': None, 'valve on': None,
+                                   'lo lim flowrate': -0.1, 'hi lim flowrate': -0.1}
         self._create_ui(data, on_update)
 
-    # @property
-    # def widget_id(self):
-    #     return self._id
-
     def _create_ui(self, data, on_update):
-        self._cached = {'enabled': data['enabled']}
-
         self.setFrameStyle(QFrame.Panel | QFrame.Raised)
         self.setFixedHeight(50)
 
@@ -55,7 +52,7 @@ class WateringZone(QFrame):
         self._spb_hi_flow.setRange(0.1, 2.0)
         self._spb_hi_flow.setSingleStep(0.1)
 
-        self._lbl_gpio = QLabel()
+        self._lbl_gpio = QLabel(f'GPIO {data["gpio_num"]}')
 
         self._lyt_layer2.addWidget(QLabel('Пределы расхода, м3/ч'))
         self._lyt_layer2.addWidget(self._spb_lo_flow)
@@ -67,11 +64,12 @@ class WateringZone(QFrame):
         self._lyt_stacked.addWidget(self._wdg_layer2)
 
         # -----------Main Layout--------------
-        self._btn_name = QPushButton()
+        self._btn_name = QPushButton(data['name'])
         self._btn_name.clicked.connect(
             lambda: on_update(ID=self._id,
-                              new_data={'enabled': not self._cached['enabled']})
-        )
+                              new_data={
+                                  'enabled': not self._cached_for_widget['enabled']
+                              }))
 
         self._btn_next_layer = QToolButton()
         self._btn_next_layer.setArrowType(Qt.RightArrow)
@@ -103,20 +101,36 @@ class WateringZone(QFrame):
         return self._curr_index
 
     def apply_updates(self, new_data):
-        self._lbl_status.setText(f'{new_data["status"].value}')
-        self._bar_progress.setValue(int(new_data['progress']))
-        self._spb_lo_flow.setValue(new_data['lo lim flowrate'])
-        self._spb_hi_flow.setValue(new_data['hi lim flowrate'])
-        self._lbl_gpio.setText(f'GPIO {new_data["gpio_num"]}')
-        self._btn_name.setText(new_data['name'])
+        changed = False
+        if abs(new_data['lo lim flowrate'] - self._cached_for_widget['lo lim flowrate']) > 0.000001:
+            self._spb_lo_flow.setValue(new_data['lo lim flowrate'])
+            changed = True
 
-        change_toggle_button_style(new_data['enabled'],
-                                   self._btn_name,
-                                   'StandardButton',
-                                   'StandardButton EnabledButton')
-        change_toggle_button_style(new_data['valve on'],
-                                   self._btn_next_layer,
-                                   'StandardButton',
-                                   'StandardButton EnabledButton')
-        for key in self._cached:
-            self._cached[key] = new_data[key]
+        if abs(new_data['hi lim flowrate'] - self._cached_for_widget['hi lim flowrate']) > 0.000001:
+            self._spb_hi_flow.setValue(new_data['hi lim flowrate'])
+            changed = True
+
+        if new_data['status'] != self._cached_for_widget['status']:
+            self._lbl_status.setText(new_data['status'].value)
+            changed = True
+        progress = int(new_data['progress'])
+        if progress != self._cached_for_widget['progress']:
+            self._bar_progress.setValue(progress)
+            changed = True
+        if new_data['enabled'] != self._cached_for_widget['enabled']:
+            change_toggle_button_style(new_data['enabled'],
+                                       self._btn_name,
+                                       'StandardButton',
+                                       'StandardButton EnabledButton')
+            changed = True
+        if new_data['valve on'] != self._cached_for_widget['valve on']:
+            change_toggle_button_style(new_data['valve on'],
+                                       self._btn_next_layer,
+                                       'StandardButton',
+                                       'StandardButton EnabledButton')
+            changed = True
+        if changed:
+            for key in self._cached_for_widget:
+                self._cached_for_widget[key] = new_data[key]
+                if key == 'progress':
+                    self._cached_for_widget[key] = progress

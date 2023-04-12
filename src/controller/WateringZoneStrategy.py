@@ -19,6 +19,7 @@ def watering_zone_strategy(zone, process):
     available = zone['available']
     valve_on = zone['valve on']
     curr_flowrate = process['curr flowrate']
+    control_flowrate = zone['control flowrate']
     hi_lim_flowrate = zone['hi lim flowrate']
     lo_lim_flowrate = zone['lo lim flowrate']
     duration_sec = zone['duration'] * 60  # from minutes to seconds
@@ -33,6 +34,8 @@ def watering_zone_strategy(zone, process):
     status = zone['status']
     alarm_log_batch = []
 
+    curr_time = QDateTime.currentDateTime()
+
     # Квитирование
     if ackn:
         if error:
@@ -44,7 +47,7 @@ def watering_zone_strategy(zone, process):
                         alarm_log_batch.append({'type': LogAlarmMessageTypes.ERROR_OUT,
                                                 'alarm ID': key,
                                                 'equip ID': zone_id,
-                                                'dt_stamp': QDateTime.currentDateTime(),
+                                                'dt_stamp': curr_time,
                                                 'text': 'OUT:' + key.value.substitute(name=name,
                                                                                       flowrate=curr_flowrate)})
                         # error_test = False # для др ошибок, если условие выхода на выполнилось, то будет True
@@ -58,10 +61,7 @@ def watering_zone_strategy(zone, process):
         if curr_state is ZoneStates.CHECK_AVAILABILITY:
             # Этот шаг исполняется один раз
 
-            if not enabled or error:
-                available = False
-            else:
-                available = True
+            available = enabled
 
             # Переходы
             curr_state = prev_state
@@ -74,7 +74,7 @@ def watering_zone_strategy(zone, process):
 
         elif curr_state is ZoneStates.CHECK_IF_DEVICES_RUNNING:
             # Постоянные действия
-            curr_time = QTime.currentTime()
+            # curr_time = QDateTime.currentDateTime()
 
             # в случае первого обор можно и не проверять if cont_on, а вот дальше для др обор нужно
             # No contactor feedback timer
@@ -90,13 +90,13 @@ def watering_zone_strategy(zone, process):
             error_test = False
             for key, val in raised_errors.items():
                 if key is ZoneErrorMessages.HIGH_FLOWRATE:
-                    if flowrate_hi_timer:
+                    if flowrate_hi_timer and control_flowrate:
                         if flowrate_hi_timer.secsTo(curr_time) > SP_DELAY:
                             raised_errors[key] = True
                             alarm_log_batch.append({'type': LogAlarmMessageTypes.ERROR_IN,
                                                     'alarm ID': key,
                                                     'equip ID': zone_id,
-                                                    'dt_stamp': QDateTime.currentDateTime(),
+                                                    'dt_stamp': curr_time,
                                                     'text': 'IN:' + key.value.substitute(name=name,
                                                                                          flowrate=curr_flowrate)})
                             flowrate_hi_timer = None
@@ -113,7 +113,7 @@ def watering_zone_strategy(zone, process):
             # Единоразовые действия при входе в шаг
             if curr_state is not prev_state:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Zone: Зона {name} отключена'})
                 prev_state = curr_state
 
@@ -127,7 +127,7 @@ def watering_zone_strategy(zone, process):
                     again = True
                 else:
                     alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                            'dt_stamp': QDateTime.currentDateTime(),
+                                            'dt_stamp': curr_time,
                                             'text': f'Zone: Полив зоны {name} не выполнялся, время полива 0'})
                     progress = 100.0
                     feedback_temp = ExecDevFeedbacks.DONE
@@ -140,12 +140,11 @@ def watering_zone_strategy(zone, process):
         elif curr_state is ZoneStates.EXECUTE:
             # Единоразовые действия при входе в шаг
             if curr_state is not prev_state:
-                curr_time = QTime.currentTime()
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Zone: Подача сигнала открытия на клапан зоны {name}'})
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Zone: Полив зоны {name} начат'})
                 valve_on = True
                 feedback = ExecDevFeedbacks.BUSY
@@ -153,11 +152,10 @@ def watering_zone_strategy(zone, process):
                 prev_state = curr_state
 
             # Постоянные действия
-            curr_time = QTime.currentTime()
             seconds_passed = state_entry_time.secsTo(curr_time)
             progress = seconds_passed / duration_sec * 100.0
 
-            # "Contactor feedback is not off" timer
+            # "Low flowrate" timer
             if curr_flowrate < lo_lim_flowrate:
                 if not flowrate_lo_timer:
                     flowrate_lo_timer = curr_time
@@ -169,14 +167,14 @@ def watering_zone_strategy(zone, process):
 
             for key, val in raised_warnings.items():
                 if key is ZoneWarningMessages.LOW_FLOWRATE:
-                    if flowrate_lo_timer:
+                    if flowrate_lo_timer and control_flowrate:
                         if flowrate_lo_timer.secsTo(curr_time) > SP_DELAY:
                             if not val:
                                 raised_warnings[key] = True
                                 alarm_log_batch.append({'type': LogAlarmMessageTypes.WARNING_IN,
                                                         'alarm ID': key,
                                                         'equip ID': zone_id,
-                                                        'dt_stamp': QDateTime.currentDateTime(),
+                                                        'dt_stamp': curr_time,
                                                         'text': 'IN:' + key.value.substitute(name=name,
                                                                                              flowrate=curr_flowrate)})
                     else:
@@ -185,14 +183,14 @@ def watering_zone_strategy(zone, process):
                             alarm_log_batch.append({'type': LogAlarmMessageTypes.WARNING_OUT,
                                                     'alarm ID': key,
                                                     'equip ID': zone_id,
-                                                    'dt_stamp': QDateTime.currentDateTime(),
+                                                    'dt_stamp': curr_time,
                                                     'text': 'OUT:' + key.value.substitute(name=name,
                                                                                           flowrate=curr_flowrate)})
 
             # Переходы
             if not available or not exec_request:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Zone: Полив зоны {name} отменен'})
                 feedback_temp = ExecDevFeedbacks.ABORTED
                 curr_state = ZoneStates.SHUTDOWN
@@ -203,7 +201,7 @@ def watering_zone_strategy(zone, process):
                 again = True
             elif seconds_passed >= duration_sec:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Zone: Полив зоны {name} выполнен'})
                 feedback_temp = ExecDevFeedbacks.DONE
                 curr_state = ZoneStates.SHUTDOWN
@@ -216,7 +214,7 @@ def watering_zone_strategy(zone, process):
             # Единоразовые действия при входе в шаг
             if curr_state is not prev_state:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Zone: Снятие сигнала открытия с клапан зоны {name}'})
                 for key, val in raised_warnings.items():
                     if key is ZoneWarningMessages.LOW_FLOWRATE:
@@ -225,17 +223,17 @@ def watering_zone_strategy(zone, process):
                             alarm_log_batch.append({'type': LogAlarmMessageTypes.WARNING_OUT,
                                                     'alarm ID': key,
                                                     'equip ID': zone_id,
-                                                    'dt_stamp': QDateTime.currentDateTime(),
+                                                    'dt_stamp': curr_time,
                                                     'text': 'OUT:' + key.value.substitute(name=name,
                                                                                           flowrate=curr_flowrate)})
                 valve_on = False
-                state_entry_time = QTime.currentTime()
+                state_entry_time = curr_time
                 prev_state = curr_state
 
             # Переходы
-            if state_entry_time.secsTo(QTime.currentTime()) >= SP_STATE_TRANSITION_TYPICAL_DELAY:
+            if state_entry_time.secsTo(QDateTime.currentDateTime()) >= SP_STATE_TRANSITION_TYPICAL_DELAY:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Zone: Сигнал открытия с клапан зоны {name} снят'})
                 curr_state = ZoneStates.RESETTING
                 again = True
@@ -269,7 +267,7 @@ def watering_zone_strategy(zone, process):
         status = OnOffDeviceStatuses.STANDBY
     elif prev_state is ZoneStates.EXECUTE:
         status = OnOffDeviceStatuses.RUN
-    elif prev_state is ZoneStates.SHUTDOWN:
+    elif prev_state is ZoneStates.SHUTDOWN or prev_state is ZoneStates.RESETTING:
         status = OnOffDeviceStatuses.SHUTDOWN
 
     # обновляем выходы

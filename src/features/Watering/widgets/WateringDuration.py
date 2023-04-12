@@ -8,6 +8,7 @@ class WateringDuration(QFrame):
         super().__init__(parent)
         self._cycle_id = data['cycle_id']
         self._zone_id = data['zone_id']
+        self._cached_for_widget = {'duration': -1}
         self._create_ui(data, on_update)
 
     def _create_ui(self, data, on_update):
@@ -29,4 +30,12 @@ class WateringDuration(QFrame):
         self._lyt_main.addWidget(self._spb_duration)
 
     def apply_updates(self, new_data):
-        self._spb_duration.setValue(new_data['duration'])
+        changed = False
+        if new_data['duration'] != self._cached_for_widget['duration']:
+            self._spb_duration.setValue(new_data['duration'])
+            changed = True
+
+        if changed:
+            for key in self._cached_for_widget:
+                self._cached_for_widget[key] = new_data[key]
+

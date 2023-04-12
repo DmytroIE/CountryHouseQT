@@ -25,6 +25,8 @@ def contactor_strategy(contactor):
     status = contactor['status']
     alarm_log_batch = []
 
+    curr_time = QDateTime.currentDateTime()
+
     # Квитирование
     if ackn:
         if error:
@@ -36,7 +38,7 @@ def contactor_strategy(contactor):
                         alarm_log_batch.append({'type': LogAlarmMessageTypes.ERROR_OUT,
                                                 'alarm ID': key,
                                                 'equip ID': cont_id,
-                                                'dt_stamp': QDateTime.currentDateTime(),
+                                                'dt_stamp': curr_time,
                                                 'text': 'OUT:' + key.value.substitute(name=name)})
                         # error_test = False # для др ошибок, если условие выхода на выполнилось, то будет True
             error = error_test
@@ -49,10 +51,6 @@ def contactor_strategy(contactor):
         if curr_state is ContactorStates.CHECK_AVAILABILITY:
             # Этот шаг исполняется один раз
 
-            # if not enabled or error:
-            #     available = False
-            # else:
-            #     available = True
             available = enabled
 
             # Переходы
@@ -61,7 +59,6 @@ def contactor_strategy(contactor):
 
         elif curr_state is ContactorStates.CHECK_IF_DEVICES_STOPPED:
             # Постоянные действия
-            curr_time = QTime.currentTime()
 
             # "Contactor feedback is not off" timer
             if not cont_on and contactor_feedback:
@@ -82,7 +79,7 @@ def contactor_strategy(contactor):
                                 alarm_log_batch.append({'type': LogAlarmMessageTypes.WARNING_IN,
                                                         'alarm ID': key,
                                                         'equip ID': cont_id,
-                                                        'dt_stamp': QDateTime.currentDateTime(),
+                                                        'dt_stamp': curr_time,
                                                         'text': 'IN:' + key.value.substitute(name=name)})
                     else:
                         # это будет работать и при запуске
@@ -91,7 +88,7 @@ def contactor_strategy(contactor):
                             alarm_log_batch.append({'type': LogAlarmMessageTypes.WARNING_OUT,
                                                     'alarm ID': key,
                                                     'equip ID': cont_id,
-                                                    'dt_stamp': QDateTime.currentDateTime(),
+                                                    'dt_stamp': curr_time,
                                                     'text': 'OUT:' + key.value.substitute(name=name)})
 
             # если есть хотя бы один активный, но еще не сработавший таймер невыключения
@@ -118,7 +115,6 @@ def contactor_strategy(contactor):
 
         elif curr_state is ContactorStates.CHECK_IF_DEVICES_RUNNING:
             # Постоянные действия
-            curr_time = QTime.currentTime()
 
             # в случае первого обор можно и не проверять if cont_on, а вот дальше для др обор нужно
             # No contactor feedback timer
@@ -150,26 +146,23 @@ def contactor_strategy(contactor):
                             alarm_log_batch.append({'type': LogAlarmMessageTypes.ERROR_IN,
                                                     'alarm ID': key,
                                                     'equip ID': cont_id,
-                                                    'dt_stamp': QDateTime.currentDateTime(),
+                                                    'dt_stamp': curr_time,
                                                     'text': 'IN:' + key.value.substitute(name=name)})
                             cont_no_fdbk_timer = None
                             error_test = True
             if error_test:
                 error = True
-                # available = False
                 curr_state = prev_state
-                # prev_state = prev_state  # это подразумевается
                 again = True
             else:
                 curr_state = ContactorStates.CHECK_AVAILABILITY
-                # prev_state = prev_state  # это подразумевается
                 again = False
 
         elif curr_state is ContactorStates.STANDBY:
             # Единоразовые действия при входе в шаг
             if curr_state is not prev_state:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Cont: Контактор {name} отключен'})
                 prev_state = curr_state
 
@@ -188,10 +181,10 @@ def contactor_strategy(contactor):
             # Единоразовые действия при входе в шаг
             if curr_state is not prev_state:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Cont: Подача сигнала запуска на контактор {name}'})
                 cont_on = True
-                state_entry_time = QTime.currentTime()
+                state_entry_time = curr_time
                 prev_state = curr_state
 
             # Постоянные действия
@@ -203,7 +196,7 @@ def contactor_strategy(contactor):
                 again = True
             elif not available:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Cont: Работа контактора {name} отменена во время запуска'})
                 curr_state = ContactorStates.SHUTDOWN
                 again = True
@@ -211,10 +204,10 @@ def contactor_strategy(contactor):
                 curr_state = ContactorStates.SHUTDOWN
                 again = True
             elif contactor_feedback and \
-                    state_entry_time.secsTo(QTime.currentTime()) >= SP_STATE_TRANSITION_TYPICAL_DELAY:
+                    state_entry_time.secsTo(curr_time) >= SP_STATE_TRANSITION_TYPICAL_DELAY:
                 # специальная задержка, чтобы побыть какое-то время в этом состоянии
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Cont: Контактор {name} запущен'})
                 curr_state = ContactorStates.RUN
                 again = True
@@ -236,7 +229,7 @@ def contactor_strategy(contactor):
                 again = True
             elif not available:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Работа контактора {name} отменена во время работы'})
                 curr_state = ContactorStates.SHUTDOWN
                 again = True
@@ -251,10 +244,10 @@ def contactor_strategy(contactor):
             # Единоразовые действия при входе в шаг
             if curr_state is not prev_state:
                 alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': QDateTime.currentDateTime(),
+                                        'dt_stamp': curr_time,
                                         'text': f'Cont: снятие сигнала запуска с контактора {name}'})
                 cont_on = False
-                state_entry_time = QTime.currentTime()
+                state_entry_time = curr_time
                 prev_state = curr_state
 
             # Постоянные действия
@@ -265,7 +258,7 @@ def contactor_strategy(contactor):
                 curr_state = ContactorStates.STARTUP
                 again = True
             elif not contactor_feedback and \
-                    state_entry_time.secsTo(QTime.currentTime()) >= SP_STATE_TRANSITION_TYPICAL_DELAY:
+                    state_entry_time.secsTo(curr_time) >= SP_STATE_TRANSITION_TYPICAL_DELAY:
                 # специальная задержка, чтобы побыть какое-то время в этом состоянии
                 curr_state = ContactorStates.STANDBY
                 again = True

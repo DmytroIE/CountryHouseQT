@@ -20,7 +20,7 @@ def contactors_reducer(state=None, action=None):
             return state
     elif action['type'] == 'contactors/ACKNOWLEDGEMENT':
         new_state = state.copy()
-        for cont_id, cont in new_state:
+        for cont_id, cont in new_state.items():
             new_cont = cont.copy()
             new_state[cont_id] = {**new_cont, **({'ackn': True})}
         return new_state
