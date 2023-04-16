@@ -106,11 +106,11 @@ class ContactorStates(Enum):
 
 
 class ContactorErrorMessages(Enum):
-    NO_FEEDBACK_WHEN_RUN = Template('Cont: Авария контактора $name')
+    NO_FEEDBACK_WHEN_RUN = 'Cont: Авария контактора {0}'
 
 
 class ContactorWarningMessages(Enum):
-    CANT_STOP_CONTACTOR = Template('Cont: Невозможно отключить контактор $name')
+    CANT_STOP_CONTACTOR = 'Cont: Невозможно отключить контактор {0}'
 
 
 SP_CONTACTOR_TIMER_DELAY = 5  # in seconds

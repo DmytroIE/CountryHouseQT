@@ -161,4 +161,4 @@ class ConnectedComponent:
                 self._cached = new_state
         else:
             print(self)
-            raise NotImplementedError()  # Защита от дурака
+            raise NotImplementedError('Fuctions _get_own_state and _on_state_update are not implemented')

@@ -2,323 +2,393 @@ from PyQt5.QtCore import QTime, QDateTime
 from string import Template
 
 from src.utils.WateringStatuses import *
+from src.store.ConnectedComponent import ConnectedComponent
 
 
-def contactor_strategy(contactor):
-    cont_id = contactor['ID']
-    name = contactor['name']
-    ackn = contactor['ackn']
-    error = contactor['error']
-    feedback = contactor['feedback']
-    contactor_feedback = contactor['contactor feedback']
-    enabled = contactor['enabled']
-    run_request = contactor['run request']
-    available = contactor['available']
-    cont_on = contactor['cont on']
-    cont_no_fdbk_timer = contactor['cont no fdbk timer']
-    cont_fdbk_not_off_timer = contactor['cont fdbk not off timer']
-    curr_state = contactor['curr state']
-    prev_state = contactor['prev state']
-    state_entry_time = contactor['state entry time']
-    raised_errors = contactor['raised errors']
-    raised_warnings = contactor['raised warnings']
-    status = contactor['status']
-    alarm_log_batch = []
+class ContactorStrategy(ConnectedComponent):
+    def __init__(self, store_, ID):
+        ConnectedComponent.__init__(self, store_)
+        self._id = ID
+        self._no_fdbk_timer = None
+        self._fdbk_not_off_timer = None
+        self._curr_state = ContactorStates.CHECK_AVAILABILITY
+        self._prev_state = ContactorStates.STANDBY
+        self._state_entry_time = None
+        self._dispatch({'type': 'contactors/UPDATE_ITEM',
+                        'payload': {'ID': self._id,
+                                    'new_data': {'ackn': False,
+                                                 'feedback': EnableDevFeedbacks.STOP,
+                                                 'cont_feedback': False,
+                                                 'run_req': False,
+                                                 'cont_on': False,
+                                                 'status': OnOffDeviceStatuses.STANDBY}
+                                    }})
 
-    curr_time = QDateTime.currentDateTime()
+    def _get_own_state(self):
+        return self._get_store_state()[self._id]
 
-    # Квитирование
-    if ackn:
-        if error:
-            error_test = False
-            for key, val in raised_errors.items():
-                if key is ContactorErrorMessages.NO_FEEDBACK_WHEN_RUN:
-                    if val:  # для более сложных ошибок типа перегрева тут будет еще и условие выхода
-                        raised_errors[key] = False
-                        alarm_log_batch.append({'type': LogAlarmMessageTypes.ERROR_OUT,
-                                                'alarm ID': key,
-                                                'equip ID': cont_id,
-                                                'dt_stamp': curr_time,
-                                                'text': 'OUT:' + key.value.substitute(name=name)})
-                        # error_test = False # для др ошибок, если условие выхода на выполнилось, то будет True
-            error = error_test
-        ackn = False
+    def run(self):
+        name = self._get_own_state()['name']
+        enabled = self._get_own_state()['enabled']
+        run_req = self._get_own_state()['run_req']
+        cont_feedback = self._get_own_state()['cont_feedback']
+        outputs = {'ackn': self._get_own_state()['ackn'],
+                   'error': self._get_own_state()['error'],
+                   'feedback': self._get_own_state()['feedback'],
+                   'available': self._get_own_state()['available'],
+                   'cont_on': self._get_own_state()['cont_on'],
+                   'raised_errors': self._get_own_state()['raised_errors'].copy(),
+                   'raised_warnings': self._get_own_state()['raised_warnings'].copy(),
+                   'status': self._get_own_state()['status']}
 
-    # Автомат
-    while True:
-        again = False
+        alarm_log_batch = []
 
-        if curr_state is ContactorStates.CHECK_AVAILABILITY:
-            # Этот шаг исполняется один раз
+        curr_time = QDateTime.currentDateTime()
 
-            available = enabled
+        # Квитирование
+        if outputs['ackn']:
+            if outputs['error']:
+                income_error_test = False
+                for key, val in outputs['raised_errors'].items():
+                    if key is ContactorErrorMessages.NO_FEEDBACK_WHEN_RUN:
+                        if val:  # для более сложных ошибок типа перегрева тут будет еще и условие выхода
+                            outputs['raised_errors'][key] = False
+                            alarm_log_batch.append({'type': LogAlarmMessageTypes.ERROR_OUT,
+                                                    'alarm_id': key,
+                                                    'equip_id': self._id,
+                                                    'dt_stamp': curr_time,
+                                                    'text': 'OUT:' + key.value.format(name)})
+                            # error_test = False # для др ошибок, если условие выхода на выполнилось, то будет True
+                outputs['error'] = income_error_test
+            outputs['ackn'] = False
 
-            # Переходы
-            curr_state = prev_state
-            again = True
+        # Автомат
+        while True:
+            again = False
 
-        elif curr_state is ContactorStates.CHECK_IF_DEVICES_STOPPED:
-            # Постоянные действия
+            if self._curr_state is ContactorStates.CHECK_AVAILABILITY:
+                # Этот шаг исполняется один раз
+                outputs['available'] = enabled
 
-            # "Contactor feedback is not off" timer
-            if not cont_on and contactor_feedback:
-                if not cont_fdbk_not_off_timer:
-                    cont_fdbk_not_off_timer = curr_time
-            else:
-                cont_fdbk_not_off_timer = None
-            # Здесь могут быть и проверки работы др оборудования
+                # Переходы
+                self._curr_state = self._prev_state
+                again = True
 
-            # В данном случае в цикле только одна проверка, но для сложного объекта их может быть много
+            elif self._curr_state is ContactorStates.CHECK_IF_DEVICES_STOPPED:
+                # Постоянные действия
 
-            for key, val in raised_warnings.items():
-                if key is ContactorWarningMessages.CANT_STOP_CONTACTOR:
-                    if cont_fdbk_not_off_timer:
-                        if cont_fdbk_not_off_timer.secsTo(curr_time) > SP_CONTACTOR_TIMER_DELAY:
-                            if not val:
-                                raised_warnings[key] = True
-                                alarm_log_batch.append({'type': LogAlarmMessageTypes.WARNING_IN,
-                                                        'alarm ID': key,
-                                                        'equip ID': cont_id,
+                # "Contactor feedback is not off" timer
+                if not outputs['cont_on'] and cont_feedback:
+                    if not self._fdbk_not_off_timer:
+                        self._fdbk_not_off_timer = curr_time
+                else:
+                    self._fdbk_not_off_timer = None
+                # Здесь могут быть и проверки работы др оборудования
+
+                # В данном случае в цикле только одна проверка, но для сложного объекта их может быть много
+
+                for key, val in outputs['raised_warnings'].items():
+                    if key is ContactorWarningMessages.CANT_STOP_CONTACTOR:
+                        if self._fdbk_not_off_timer:
+                            if self._fdbk_not_off_timer.secsTo(curr_time) > SP_CONTACTOR_TIMER_DELAY:
+                                if not val:
+                                    outputs['raised_warnings'][key] = True
+                                    alarm_log_batch.append({'type': LogAlarmMessageTypes.WARNING_IN,
+                                                            'alarm_id': key,
+                                                            'equip_id': self._id,
+                                                            'dt_stamp': curr_time,
+                                                            'text': 'IN:' + key.value.format(name)})
+                        else:
+                            # это будет работать и при запуске
+                            if val:
+                                outputs['raised_warnings'][key] = False
+                                alarm_log_batch.append({'type': LogAlarmMessageTypes.WARNING_OUT,
+                                                        'alarm_id': key,
+                                                        'equip_id': self._id,
                                                         'dt_stamp': curr_time,
-                                                        'text': 'IN:' + key.value.substitute(name=name)})
-                    else:
-                        # это будет работать и при запуске
-                        if val:
-                            raised_warnings[key] = False
-                            alarm_log_batch.append({'type': LogAlarmMessageTypes.WARNING_OUT,
-                                                    'alarm ID': key,
-                                                    'equip ID': cont_id,
-                                                    'dt_stamp': curr_time,
-                                                    'text': 'OUT:' + key.value.substitute(name=name)})
+                                                        'text': 'OUT:' + key.value.format(name)})
 
-            # если есть хотя бы один активный, но еще не сработавший таймер невыключения
-            # когда больше одного таймера, то их собрать в массив и тоже применить any
-            list_of_warning_bits = raised_warnings.values()
+                # если есть хотя бы один активный, но еще не сработавший таймер невыключения
+                # когда больше одного таймера, то их собрать в массив и тоже применить any
+                list_of_warning_bits = outputs['raised_warnings'].values()
+                list_of_started_timers = [self._fdbk_not_off_timer]
 
-            if not any(list_of_warning_bits) and cont_fdbk_not_off_timer:
-                feedback = EnableDevFeedbacks.PENDING
+                if not any(list_of_warning_bits) and any(list_of_started_timers):
+                    outputs['feedback'] = EnableDevFeedbacks.PENDING
 
-            # если же хотя бы один таймер невыключения сработал
-            if not run_request:
-                if any(list_of_warning_bits):
-                    feedback = EnableDevFeedbacks.NOT_STOP
-            # а уж если все сработали (не в этом случае, когда всего один таймер, а если более сложное устройство)
+                # если же хотя бы один таймер невыключения сработал
+                if not run_req:
+                    if any(list_of_warning_bits):
+                        outputs['feedback'] = EnableDevFeedbacks.NOT_STOP
+                # а уж если все сработали (не в этом случае, когда всего один таймер, а если более сложное устройство)
+                else:
+                    if all(list_of_warning_bits):
+                        outputs['feedback'] = EnableDevFeedbacks.RUN
+
+                # Переходы
+                self._curr_state = ContactorStates.CHECK_IF_DEVICES_RUNNING
+                again = True
+
+            elif self._curr_state is ContactorStates.CHECK_IF_DEVICES_RUNNING:
+                # Постоянные действия
+
+                # No contactor feedback timer
+                if outputs['cont_on'] and not cont_feedback:
+                    if not self._no_fdbk_timer:
+                        self._no_fdbk_timer = curr_time
+                else:
+                    self._no_fdbk_timer = None
+
+                # Здесь могут быть и проверки работы др оборудования
+
+                income_error_test = False
+                for key, val in outputs['raised_errors'].items():
+                    if key is ContactorErrorMessages.NO_FEEDBACK_WHEN_RUN:
+                        if self._no_fdbk_timer:
+                            if self._no_fdbk_timer.secsTo(curr_time) > SP_CONTACTOR_TIMER_DELAY:
+                                # здесь могут быть и др условия через ИЛИ:
+                                # ИЛИ сигнала с контактора нет, ИЛИ шаровый кран не открылся ИЛИ ...
+                                outputs['raised_errors'][key] = True
+                                alarm_log_batch.append({'type': LogAlarmMessageTypes.ERROR_IN,
+                                                        'alarm_id': key,
+                                                        'equip_id': self._id,
+                                                        'dt_stamp': curr_time,
+                                                        'text': 'IN:' + key.value.format(name)})
+                                self._no_fdbk_timer = None
+                                income_error_test = True
+                if income_error_test:
+                    outputs['error'] = True
+                list_of_started_timers = [self._no_fdbk_timer]
+                if not outputs['error'] and any(list_of_started_timers):
+                    outputs['feedback'] = EnableDevFeedbacks.PENDING
+                if run_req:
+                    if not outputs['available'] or outputs['error']:
+                        if not cont_feedback:  # обязательно эта проверка
+                            # может появиться cont_feedback даже во время аварии, если есть запрос run_req,
+                            # то получается, что он выполняется, раз есть cont_feedback
+                            outputs['feedback'] = EnableDevFeedbacks.NOT_RUN
+                        # else:
+                        #     outputs['feedback'] = EnableDevFeedbacks.RUN
+
+                # Переходы
+                if income_error_test:
+                    self._curr_state = self._prev_state
+                    again = True
+                else:
+                    self._curr_state = ContactorStates.CHECK_AVAILABILITY
+                    again = False
+
+            elif self._curr_state is ContactorStates.STANDBY:
+                # Единоразовые действия при входе в шаг
+                if self._curr_state is not self._prev_state:
+                    alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
+                                            'dt_stamp': curr_time,
+                                            'text': f'Cont: Контактор {name} отключен'})
+                    self._prev_state = self._curr_state
+
+                # Постоянные действия
+                outputs['feedback'] = EnableDevFeedbacks.STOP
+
+                # Переходы
+                if outputs['available'] and not outputs['error'] and run_req:
+                    self._curr_state = ContactorStates.STARTUP
+                    again = True
+                else:
+                    self._curr_state = ContactorStates.CHECK_IF_DEVICES_STOPPED
+                    again = True
+
+            elif self._curr_state is ContactorStates.STARTUP:
+                # Единоразовые действия при входе в шаг
+                if self._curr_state is not self._prev_state:
+                    alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
+                                            'dt_stamp': curr_time,
+                                            'text': f'Cont: Подача сигнала запуска на контактор {name}'})
+                    outputs['cont_on'] = True
+                    self._state_entry_time = curr_time
+                    self._prev_state = self._curr_state
+
+                # Постоянные действия
+                outputs['feedback'] = EnableDevFeedbacks.PENDING
+
+                # Переходы
+                if not run_req:
+                    self._curr_state = ContactorStates.SHUTDOWN
+                    again = True
+                elif not outputs['available']:
+                    alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
+                                            'dt_stamp': curr_time,
+                                            'text': f'Cont: Работа контактора {name} отменена во время запуска'})
+                    self._curr_state = ContactorStates.SHUTDOWN
+                    again = True
+                elif outputs['error']:
+                    self._curr_state = ContactorStates.SHUTDOWN
+                    again = True
+                elif cont_feedback and \
+                        self._state_entry_time.secsTo(curr_time) >= SP_STATE_TRANSITION_TYPICAL_DELAY:
+                    # специальная задержка, чтобы побыть какое-то время в этом состоянии
+                    alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
+                                            'dt_stamp': curr_time,
+                                            'text': f'Cont: Контактор {name} запущен'})
+                    self._curr_state = ContactorStates.RUN
+                    again = True
+                else:
+                    self._curr_state = ContactorStates.CHECK_IF_DEVICES_STOPPED
+                    again = True
+
+            elif self._curr_state is ContactorStates.RUN:
+                # Единоразовые действия при входе в шаг
+                if self._curr_state is not self._prev_state:
+                    self._prev_state = self._curr_state
+
+                # Постоянные действия
+                outputs['feedback'] = EnableDevFeedbacks.RUN
+
+                # Переходы
+                if not run_req:
+                    self._curr_state = ContactorStates.SHUTDOWN
+                    again = True
+                elif not outputs['available']:
+                    alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
+                                            'dt_stamp': curr_time,
+                                            'text': f'Работа контактора {name} отменена во время работы'})
+                    self._curr_state = ContactorStates.SHUTDOWN
+                    again = True
+                elif outputs['error']:
+                    self._curr_state = ContactorStates.SHUTDOWN
+                    again = True
+                else:
+                    self._curr_state = ContactorStates.CHECK_IF_DEVICES_STOPPED
+                    again = True
+
+            elif self._curr_state is ContactorStates.SHUTDOWN:
+                # Единоразовые действия при входе в шаг
+                if self._curr_state is not self._prev_state:
+                    alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
+                                            'dt_stamp': curr_time,
+                                            'text': f'Cont: снятие сигнала запуска с контактора {name}'})
+                    outputs['cont_on'] = False
+                    self._state_entry_time = curr_time
+                    self._prev_state = self._curr_state
+
+                # Постоянные действия
+                outputs['feedback'] = EnableDevFeedbacks.PENDING
+
+                # Переходы
+                if run_req and not outputs['error'] and outputs['available']:
+                    self._curr_state = ContactorStates.STARTUP
+                    again = True
+                elif not cont_feedback and \
+                        self._state_entry_time.secsTo(curr_time) >= SP_STATE_TRANSITION_TYPICAL_DELAY:
+                    # специальная задержка, чтобы побыть какое-то время в этом состоянии
+                    self._curr_state = ContactorStates.STANDBY
+                    again = True
+                else:
+                    self._curr_state = ContactorStates.CHECK_IF_DEVICES_STOPPED
+                    again = True
+
+            if not again:
+                break
+
+        # статусы
+        if self._prev_state is ContactorStates.STANDBY:
+            if outputs['error']:
+                outputs['status'] = OnOffDeviceStatuses.FAULTY
+            elif not outputs['available']:
+                outputs['status'] = OnOffDeviceStatuses.OFF
             else:
-                if all(list_of_warning_bits):
-                    feedback = EnableDevFeedbacks.RUN
+                outputs['status'] = OnOffDeviceStatuses.STANDBY
+        elif self._prev_state is ContactorStates.STARTUP:
+            outputs['status'] = OnOffDeviceStatuses.STARTUP
+        elif self._prev_state is ContactorStates.RUN:
+            outputs['status'] = OnOffDeviceStatuses.RUN
+        elif self._prev_state is ContactorStates.SHUTDOWN:
+            outputs['status'] = OnOffDeviceStatuses.SHUTDOWN
 
-            # Переходы
-            curr_state = ContactorStates.CHECK_IF_DEVICES_RUNNING
-            # prev_state = prev_state  # это подразумевается, на след цикле после CHECK_AVAILABLE вернемся
-            # на тот шаг выключения, где застряли
-            again = True
+        # обновляем выходы
+        checked_outputs = {}
+        for key, val in outputs.items():
+            if val != self._get_own_state()[key]:
+                checked_outputs[key] = val
+        if checked_outputs:
+            # print(f'{checked_outputs=}')
+            self._dispatch({'type': 'contactors/UPDATE_ITEM',
+                            'payload': {'ID': self._id,
+                                        'new_data': checked_outputs}})
+        if alarm_log_batch:
+            for item in alarm_log_batch:
+                print(f'{item["dt_stamp"].toString("dd.MM.yy mm:ss")} {item["text"]}')
 
-        elif curr_state is ContactorStates.CHECK_IF_DEVICES_RUNNING:
-            # Постоянные действия
-
-            # в случае первого обор можно и не проверять if cont_on, а вот дальше для др обор нужно
-            # No contactor feedback timer
-            if cont_on and not contactor_feedback:
-                if not cont_no_fdbk_timer:
-                    cont_no_fdbk_timer = curr_time
-            else:
-                cont_no_fdbk_timer = None
-
-            # Здесь могут быть и проверки работы др оборудования
-
-            # когда больше одного таймера, то их собрать в массив и применить any
-            if cont_no_fdbk_timer:
-                feedback = EnableDevFeedbacks.PENDING
-            if run_request and (not available or error):
-                if not contactor_feedback:  # поменять потом эту строчку, если много подконтрольного
-                    # оборудования, то все это проверять задолбешься
-                    feedback = EnableDevFeedbacks.NOT_RUN
-
-            # Переходы
-            error_test = False
-            for key, val in raised_errors.items():
-                if key is ContactorErrorMessages.NO_FEEDBACK_WHEN_RUN:
-                    if cont_no_fdbk_timer:
-                        if cont_no_fdbk_timer.secsTo(curr_time) > SP_CONTACTOR_TIMER_DELAY:
-                            # здесь могут быть и др условия через ИЛИ:
-                            # ИЛИ сигнала с контактора нет, ИЛИ шаровый кран не открылся ИЛИ ...
-                            raised_errors[key] = True
-                            alarm_log_batch.append({'type': LogAlarmMessageTypes.ERROR_IN,
-                                                    'alarm ID': key,
-                                                    'equip ID': cont_id,
-                                                    'dt_stamp': curr_time,
-                                                    'text': 'IN:' + key.value.substitute(name=name)})
-                            cont_no_fdbk_timer = None
-                            error_test = True
-            if error_test:
-                error = True
-                curr_state = prev_state
-                again = True
-            else:
-                curr_state = ContactorStates.CHECK_AVAILABILITY
-                again = False
-
-        elif curr_state is ContactorStates.STANDBY:
-            # Единоразовые действия при входе в шаг
-            if curr_state is not prev_state:
-                alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': curr_time,
-                                        'text': f'Cont: Контактор {name} отключен'})
-                prev_state = curr_state
-
-            # Постоянные действия
-            feedback = EnableDevFeedbacks.STOP
-
-            # Переходы
-            if available and not error and run_request:
-                curr_state = ContactorStates.STARTUP
-                again = True
-            else:
-                curr_state = ContactorStates.CHECK_IF_DEVICES_STOPPED
-                again = True
-
-        elif curr_state is ContactorStates.STARTUP:
-            # Единоразовые действия при входе в шаг
-            if curr_state is not prev_state:
-                alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': curr_time,
-                                        'text': f'Cont: Подача сигнала запуска на контактор {name}'})
-                cont_on = True
-                state_entry_time = curr_time
-                prev_state = curr_state
-
-            # Постоянные действия
-            feedback = EnableDevFeedbacks.PENDING
-
-            # Переходы
-            if not run_request:
-                curr_state = ContactorStates.SHUTDOWN
-                again = True
-            elif not available:
-                alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': curr_time,
-                                        'text': f'Cont: Работа контактора {name} отменена во время запуска'})
-                curr_state = ContactorStates.SHUTDOWN
-                again = True
-            elif error:
-                curr_state = ContactorStates.SHUTDOWN
-                again = True
-            elif contactor_feedback and \
-                    state_entry_time.secsTo(curr_time) >= SP_STATE_TRANSITION_TYPICAL_DELAY:
-                # специальная задержка, чтобы побыть какое-то время в этом состоянии
-                alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': curr_time,
-                                        'text': f'Cont: Контактор {name} запущен'})
-                curr_state = ContactorStates.RUN
-                again = True
-            else:
-                curr_state = ContactorStates.CHECK_IF_DEVICES_STOPPED
-                again = True
-
-        elif curr_state is ContactorStates.RUN:
-            # Единоразовые действия при входе в шаг
-            if curr_state is not prev_state:
-                prev_state = curr_state
-
-            # Постоянные действия
-            feedback = EnableDevFeedbacks.RUN
-
-            # Переходы
-            if not run_request:
-                curr_state = ContactorStates.SHUTDOWN
-                again = True
-            elif not available:
-                alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': curr_time,
-                                        'text': f'Работа контактора {name} отменена во время работы'})
-                curr_state = ContactorStates.SHUTDOWN
-                again = True
-            elif error:
-                curr_state = ContactorStates.SHUTDOWN
-                again = True
-            else:
-                curr_state = ContactorStates.CHECK_IF_DEVICES_STOPPED
-                again = True
-
-        elif curr_state is ContactorStates.SHUTDOWN:
-            # Единоразовые действия при входе в шаг
-            if curr_state is not prev_state:
-                alarm_log_batch.append({'type': LogInfoMessageTypes.COMMON_INFO,
-                                        'dt_stamp': curr_time,
-                                        'text': f'Cont: снятие сигнала запуска с контактора {name}'})
-                cont_on = False
-                state_entry_time = curr_time
-                prev_state = curr_state
-
-            # Постоянные действия
-            feedback = EnableDevFeedbacks.PENDING
-
-            # Переходы
-            if run_request and not error and available:
-                curr_state = ContactorStates.STARTUP
-                again = True
-            elif not contactor_feedback and \
-                    state_entry_time.secsTo(curr_time) >= SP_STATE_TRANSITION_TYPICAL_DELAY:
-                # специальная задержка, чтобы побыть какое-то время в этом состоянии
-                curr_state = ContactorStates.STANDBY
-                again = True
-            else:
-                curr_state = ContactorStates.CHECK_IF_DEVICES_STOPPED
-                again = True
-
-        if not again:
-            break
-
-    # статусы
-    if prev_state is ContactorStates.STANDBY:
-        if error:
-            status = OnOffDeviceStatuses.FAULTY
-        elif not available:
-            status = OnOffDeviceStatuses.OFF
-        else:
-            status = OnOffDeviceStatuses.STANDBY
-    elif prev_state is ContactorStates.STARTUP:
-        status = OnOffDeviceStatuses.STARTUP
-    elif prev_state is ContactorStates.RUN:
-        status = OnOffDeviceStatuses.RUN
-    elif prev_state is ContactorStates.SHUTDOWN:
-        status = OnOffDeviceStatuses.SHUTDOWN
-
-    # обновляем выходы
-    cont_outputs = {'ackn': ackn,
-                    'error': error,
-                    'feedback': feedback,
-                    'available': available,
-                    'cont on': cont_on,
-                    'cont no fdbk timer': cont_no_fdbk_timer,
-                    'cont fdbk not off timer': cont_fdbk_not_off_timer,
-                    'curr state': curr_state,
-                    'prev state': prev_state,
-                    'state entry time': state_entry_time,
-                    'raised errors': raised_errors,
-                    'raised warnings': raised_warnings,
-                    'status': status
-                    }
-    return cont_outputs, alarm_log_batch
+    def _updater(self):
+        pass
 
 
 if __name__ == '__main__':
     from PyQt5.QtCore import QTimer
     from PyQt5.QtWidgets import \
-        QApplication, QMainWindow, QPushButton, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QTextBrowser
+        QApplication, QMainWindow, QPushButton, QWidget, QHBoxLayout, QVBoxLayout, QTextBrowser
     import pydux
+    import pickle
+    from collections import OrderedDict
     from src.store.ConnectedComponent import ConnectedComponent
     from src.utils.Buttons import *
 
-    keys_to_print = ['error', 'feedback', 'available',
-                     'cont on', 'curr state', 'prev state', 'cont no fdbk timer', 'cont fdbk not off timer',
-                     'status']
+    keys_to_print = ['ackn', 'error', 'available', 'enabled', 'cont_on', 'feedback', 'status']
+
+
+    def reducer(state=None, action=None):
+        if state is None:
+            state = {}
+        if action['type'] == 'contactors/UPDATE_ITEM':
+            cont_id = action['payload']['ID']
+            new_state = state.copy()
+            new_state[cont_id] = {**new_state[cont_id], **(action['payload']['new_data'])}
+            return new_state
+        else:
+            return state
+
+
+    default_state = OrderedDict({'3RR2fg65': {'ID': '3RR2fg65',
+                                              'name': 'Свет',
+                                              'ackn': False,
+                                              'error': False,
+                                              'feedback': EnableDevFeedbacks.STOP,
+                                              'cont_feedback': False,
+                                              'enabled': True,
+                                              'run_req': False,
+                                              'available': True,
+                                              'cont_on': False,
+                                              'raised_errors': {ContactorErrorMessages.NO_FEEDBACK_WHEN_RUN: False},
+                                              'raised_warnings': {ContactorWarningMessages.CANT_STOP_CONTACTOR: False},
+                                              'status': OnOffDeviceStatuses.STANDBY
+                                              }})
+
+
+    class Application(QApplication):
+        def __init__(self, args):
+            QApplication.__init__(self, args)
+            print('Application created')
+            self.store = None
+            try:
+                with open('store.dat', 'rb') as f:
+                    state = pickle.load(f)
+                    print(f'state after loading {state}')
+                    self.store = pydux.create_store(reducer, state)
+            except Exception as e:
+                print(f'Could not open dat file, default settings are loaded\nError: {e}')
+                self.store = pydux.create_store(reducer, default_state)
+
+        def save_store_on_exit(self):
+            try:
+                with open('store.dat', 'wb') as f:
+                    pickle.dump(self.store.get_state(), f, pickle.HIGHEST_PROTOCOL)
+            except Exception as e:
+                print(f'Could not save store\nError: {e}')
 
 
     class MainWindow(ConnectedComponent, QMainWindow):
-        def __init__(self, store1):
+        def __init__(self, store_):
             QMainWindow.__init__(self)
-            ConnectedComponent.__init__(self, store1)
+            ConnectedComponent.__init__(self, store_)
 
             self._create_ui()
             self._updater()
@@ -327,13 +397,15 @@ if __name__ == '__main__':
             return self._get_store_state()
 
         def _on_state_update(self, new_state, updated_keys_list, action):
+            # print(f'{new_state=}')
             if action == 'ADD' or action == 'UPDATE':
-                for key in updated_keys_list:
-                    if key in self._updated_widgets_map:
-                        self._updated_widgets_map[key](new_state[key])
+                for cont_id in new_state:
+                    for key in new_state[cont_id]:
+                        if key in self._updated_widgets_map:
+                            self._updated_widgets_map[key](new_state[cont_id][key])
 
-                new_text = [f'{k}: {new_state[k]}' for k in keys_to_print]
-                self._txt_view.setText('\n'.join(new_text))
+                    new_text = [f'{k}: {new_state[cont_id][k]}' for k in keys_to_print]
+                    self._txt_view.setText('\n'.join(new_text))
 
         def _create_ui(self):
             self.setStyleSheet('.StandardButton {\
@@ -355,7 +427,6 @@ if __name__ == '__main__':
                                        .EnabledButton:hover{\
                                                       border-color: rgb(130,205,191);\
                                                       background-color: rgb(163, 195, 201);}')
-            state = self._get_own_state()
 
             self.setWindowTitle("Test Pump Strategy")
             self.setGeometry(0, 0, 640, 480)
@@ -367,9 +438,11 @@ if __name__ == '__main__':
 
             self._btn_enable = QPushButton('Enable')
             self._btn_enable.clicked.connect(
-                lambda: self._dispatch({'type': 'pump/UPDATE',
+                lambda: self._dispatch({'type': 'contactors/UPDATE_ITEM',
                                         'payload':
-                                            {'enabled': not self._get_own_state()['enabled']}
+                                            {'ID': '3RR2fg65',
+                                             'new_data':
+                                                 {'enabled': not self._get_own_state()['3RR2fg65']['enabled']}}
                                         }))
             self._updated_widgets_map['enabled'] = \
                 lambda x: change_toggle_button_style(x,
@@ -379,11 +452,13 @@ if __name__ == '__main__':
 
             self._btn_run = QPushButton('Run')
             self._btn_run.clicked.connect(
-                lambda: self._dispatch({'type': 'pump/UPDATE',
+                lambda: self._dispatch({'type': 'contactors/UPDATE_ITEM',
                                         'payload':
-                                            {'run request': not self._get_own_state()['run request']}
+                                            {'ID': '3RR2fg65',
+                                             'new_data':
+                                                 {'run_req': not self._get_own_state()['3RR2fg65']['run_req']}}
                                         }))
-            self._updated_widgets_map['run request'] = \
+            self._updated_widgets_map['run_req'] = \
                 lambda x: change_toggle_button_style(x,
                                                      self._btn_run,
                                                      'StandardButton',
@@ -391,11 +466,14 @@ if __name__ == '__main__':
 
             self._btn_cont_fdbk = QPushButton('Cont fdbk')
             self._btn_cont_fdbk.clicked.connect(
-                lambda: self._dispatch({'type': 'pump/UPDATE',
+                lambda: self._dispatch({'type': 'contactors/UPDATE_ITEM',
                                         'payload':
-                                            {'contactor feedback': not self._get_own_state()['contactor feedback']}
-                                        }))
-            self._updated_widgets_map['contactor feedback'] = \
+                                            {'ID': '3RR2fg65',
+                                             'new_data':
+                                                 {'cont_feedback': not self._get_own_state()['3RR2fg65'][
+                                                     'cont_feedback']}
+                                             }}))
+            self._updated_widgets_map['cont_feedback'] = \
                 lambda x: change_toggle_button_style(x,
                                                      self._btn_cont_fdbk,
                                                      'StandardButton',
@@ -403,9 +481,11 @@ if __name__ == '__main__':
 
             self._btn_ackn = QPushButton('Ackn')
             self._btn_ackn.clicked.connect(
-                lambda: self._dispatch({'type': 'pump/UPDATE',
+                lambda: self._dispatch({'type': 'contactors/UPDATE_ITEM',
                                         'payload':
-                                            {'ackn': not self._get_own_state()['ackn']}
+                                            {'ID': '3RR2fg65',
+                                             'new_data':
+                                                 {'ackn': True}}
                                         }))
             self._updated_widgets_map['ackn'] = \
                 lambda x: change_toggle_button_style(x,
@@ -429,21 +509,22 @@ if __name__ == '__main__':
 
             self.setCentralWidget(self._wdg_central)
 
+        def closeEvent(self, event):
+            appl = QApplication.instance()
+            appl.save_store_on_exit()
+
 
     class ContController(ConnectedComponent):
-        def __init__(self, store1):
-            ConnectedComponent.__init__(self, store1)
+        def __init__(self, store_):
+            ConnectedComponent.__init__(self, store_)
+            self._contactor = ContactorStrategy(store_, '3RR2fg65')
             self._one_second_timer = QTimer()
             self._one_second_timer.timeout.connect(self._on_timer_tick)
             self._one_second_timer.start(1000)
 
         def _on_timer_tick(self):
-            state = self._get_store_state()
             try:
-                new_state_chunk, alarm_log_batch = contactor_strategy(state)
-                self._dispatch({'type': 'pump/UPDATE', 'payload': new_state_chunk})
-                for item in alarm_log_batch:
-                    print(f'{item["dt_stamp"].toString("dd.MM.yy mm:ss")} {item["text"]}')
+                self._contactor.run()
             except Exception as e:
                 print(f'Ошибка выполнения автомата, {e}')
 
@@ -451,44 +532,11 @@ if __name__ == '__main__':
             pass
 
 
-    init_state = {'ID': '3265',
-                  'name': 'Pump',
-                  'ackn': False,
-                  'error': False,
-                  'feedback': EnableDevFeedbacks.STOP,
-                  'contactor feedback': False,
-                  'enabled': True,
-                  'run request': False,
-                  'available': True,
-                  'cont on': False,
-                  'cont no fdbk timer': None,
-                  'cont fdbk not off timer': None,
-                  'curr state': ContactorStates.CHECK_AVAILABILITY,
-                  'prev state': ContactorStates.STANDBY,
-                  'state entry time': None,
-                  'raised errors': {ContactorErrorMessages.NO_FEEDBACK_WHEN_RUN: False},
-                  'raised warnings': {ContactorWarningMessages.CANT_STOP_CONTACTOR: False},
-                  'status': OnOffDeviceStatuses.STANDBY
-                  }
+    app = Application([])
 
+    controller = ContController(app.store)
 
-    def reducer(state=None, action=None):
-        if state is None:
-            state = {}
-        elif action['type'] == 'pump/UPDATE':
-            new_state = {**state, **(action['payload'])}
-            return new_state
-        else:
-            return state
-
-
-    store = pydux.create_store(reducer, init_state)
-
-    app = QApplication([])
-
-    window = MainWindow(store)
-    controller = ContController(store)
-
+    window = MainWindow(app.store)
     window.show()
 
     app.exec()
