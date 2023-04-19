@@ -282,13 +282,8 @@ root_reducer = pydux.combine_reducers({'watering': watering_reducer,
 #         return thunk_dispatch
 #     return wrapper
 
-
-mw_stack = pydux.apply_middleware(check_flowrate_limits_mw,
-                                  alarm_log_middleware)
-
-store = pydux.create_store(root_reducer, initial_state, mw_stack)
-
-
-class ConnectedToStoreComponent(ConnectedComponent):
-    def __init__(self):
-        ConnectedComponent.__init__(self, store)
+#
+# mw_stack = pydux.apply_middleware(check_flowrate_limits_mw,
+#                                   alarm_log_middleware)
+#
+# store = pydux.create_store(root_reducer, initial_state, mw_stack)

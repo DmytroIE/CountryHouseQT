@@ -1,13 +1,12 @@
-from PyQt5.QtCore import QTime, QDateTime
-from string import Template
+from PyQt5.QtCore import QDateTime
+from src.store.ConnectedToStoreComponent import ConnectedToStoreComponent
 
 from src.utils.WateringStatuses import *
-from src.store.ConnectedComponent import ConnectedComponent
 
 
-class ContactorStrategy(ConnectedComponent):
-    def __init__(self, store_, ID):
-        ConnectedComponent.__init__(self, store_)
+class ContactorStrategy(ConnectedToStoreComponent):
+    def __init__(self, ID):
+        ConnectedToStoreComponent.__init__(self)
         self._id = ID
         self._no_fdbk_timer = None
         self._fdbk_not_off_timer = None
@@ -329,7 +328,6 @@ if __name__ == '__main__':
     import pydux
     import pickle
     from collections import OrderedDict
-    from src.store.ConnectedComponent import ConnectedComponent
     from src.utils.Buttons import *
 
     keys_to_print = ['ackn', 'error', 'available', 'enabled', 'cont_on', 'feedback', 'status']
@@ -385,10 +383,10 @@ if __name__ == '__main__':
                 print(f'Could not save store\nError: {e}')
 
 
-    class MainWindow(ConnectedComponent, QMainWindow):
-        def __init__(self, store_):
+    class MainWindow(ConnectedToStoreComponent, QMainWindow):
+        def __init__(self):
             QMainWindow.__init__(self)
-            ConnectedComponent.__init__(self, store_)
+            ConnectedToStoreComponent.__init__(self)
 
             self._create_ui()
             self._updater()
@@ -514,10 +512,10 @@ if __name__ == '__main__':
             appl.save_store_on_exit()
 
 
-    class ContController(ConnectedComponent):
-        def __init__(self, store_):
-            ConnectedComponent.__init__(self, store_)
-            self._contactor = ContactorStrategy(store_, '3RR2fg65')
+    class ContController(ConnectedToStoreComponent):
+        def __init__(self):
+            ConnectedToStoreComponent.__init__(self)
+            self._contactor = ContactorStrategy('3RR2fg65')
             self._one_second_timer = QTimer()
             self._one_second_timer.timeout.connect(self._on_timer_tick)
             self._one_second_timer.start(1000)
@@ -534,9 +532,9 @@ if __name__ == '__main__':
 
     app = Application([])
 
-    controller = ContController(app.store)
+    controller = ContController()
 
-    window = MainWindow(app.store)
+    window = MainWindow()
     window.show()
 
     app.exec()

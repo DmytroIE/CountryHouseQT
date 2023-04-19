@@ -60,11 +60,11 @@ class ZoneStates(Enum):
 
 
 class ZoneErrorMessages(Enum):
-    HIGH_FLOWRATE = Template('Zone: Зона $name: расход воды высокий ($flowrate), возможен порыв')
+    HIGH_FLOWRATE = 'Zone: Зона {0}: расход воды высокий ({1}), возможен порыв'
 
 
 class ZoneWarningMessages(Enum):
-    LOW_FLOWRATE = Template('Zone: Зона $name: малый расход воды ($flowrate)')
+    LOW_FLOWRATE = 'Zone: Зона {0}: малый расход воды ({1})'
 
 
 class WateringProcessErrorMessages(Enum):
