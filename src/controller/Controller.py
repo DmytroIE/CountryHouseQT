@@ -3,7 +3,7 @@ from itertools import cycle as cyclic
 
 from src.store.store import ConnectedToStoreComponent
 from src.controller.ContactorStrategy import contactor_strategy
-from src.controller.UnivPumpContactorStrategy import univ_pump_cont_strategy
+from src.controller.SplitInputDecorator import univ_pump_cont_strategy
 from src.controller.WateringProcessStrategy import watering_process_strategy
 from src.controller.WateringZoneStrategy import watering_zone_strategy
 from src.controller.WateringCycleStrategy import watering_cycle_strategy
